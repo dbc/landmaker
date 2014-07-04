@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from setuptools import setup,Command,os
 from setuptools.command import sdist
 
@@ -17,7 +18,7 @@ class veryclean(Command):
     def run(self):
         import os
         os.system('rm -rf *.html docs/*.html')
-        os.system('rm -rf *.pyc tests/*.pyc')
+        os.system('rm -rf *.pyc */*.pyc')
         #os.system('rm -rf testfile.txt tests/testfile.txt')
         os.system('rm -rf build')
         os.system('rm -rf dist')
