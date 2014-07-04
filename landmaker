@@ -1,0 +1,145 @@
+#!/usr/bin/env python
+
+#   Copyright 2014 David B. Curtis
+
+#   This file is part of landmaker.
+#   
+#   landmaker is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#   
+#   landmaker is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#   
+#   You should have received a copy of the GNU General Public License
+#   along with landmaker.  If not, see <http://www.gnu.org/licenses/>.
+#   
+
+import os
+import argparse
+import commands.commandcore as cmd
+import plugins.footprintcore as fpc
+
+
+def processArgs():
+    parser = argparse.ArgumentParser(
+        description="Create pcb footprints.",
+        epilog="""
+landmaker enters interactive mode if no script is specified.
+Optional rc file is first found of: ./landmaker.rc, ~/.landmaker/landmaker.rc""")
+    parser.add_argument('--norc', action='store_true',
+        help='Disable automatic rc file search.')
+    parser.add_argument('--rc',nargs=1,
+        help='Use explicit rc file instead of automatic file search.')
+    parser.add_argument('--fp',nargs=1,
+        help='Render footprint to output.')
+    parser.add_argument('--kicad',action='store_true',
+        help='Homework for Wayne.')
+    parser.add_argument('--debug',nargs=1,
+        help='Debug switches.')
+    parser.add_argument('script', nargs='?',
+        help='Batch mode footprint creation.')
+    args = parser.parse_args()
+    args.debug = '' if args.debug == None else args.debug[0]
+    return args
+
+def interactive():
+    while True:
+        try:
+            ln = raw_input('> ')
+        except EOFError:
+            break
+        try:
+            cmd.dispatchCommand(ln)
+        except cmd.CommandSyntax as e:
+            print e.args[0]
+        except StopIteration:
+            break
+        
+def batch(fileName, warningCallback):
+    # Don't trap exceptions, let them halt program.
+    cmd.verbs['include'].execute(fileName, warningCallback)
+
+def processRc(warningCallback):
+    if args.norc:
+        return
+    rcname = 'landmaker.rc'
+    rcfilepath = None
+    if args.rc:
+        # Explicit rc file.
+        rcfilepath = args.rc[0]
+    else:
+        if os.path.isfile(rcname):
+            # rc file in cwd
+            rcfilepath = rcname
+        else:
+            home = os.path.expanduser('~')
+            fn = '/'.join([home, '.landmaker', rcname])
+            if os.path.isfile(fn):
+                # User config rc file.
+                rcfilepath = fn
+    if 'a' in args.debug:
+        print 'rcfilepath:',rcfilepath
+    if not os.path.isfile(rcfilepath):
+        print rcfilepath.join(['rc file:',' not found.'])
+    if rcfilepath != None:
+        batch(rcfilepath, warningCallback)           
+
+##class MajorHack(object):
+##    pass
+
+def init(warningCallback):
+    # Propagate debug flags.
+    cmd.debug = args.debug
+    fpc.debug = args.debug
+    # Give the 'fp' command a reference to the plugins.
+    cmd.verbs['fp'].plugins = pl.fp_plugins
+    # Give the 'ruleset' command references to rule set class and rule set globals.
+    cmd.verbs['ruleset'].rulesDictClass = fpc.RulesDictionary
+    cmd.verbs['ruleset'].ruleSets = fpc.ruleSets
+    cmd.verbs['ruleset'].execute('default', warningCallback)
+    # Give the 'drillrack' command references to rack class and rack globals.
+    cmd.verbs['drillrack'].rackClass = fpc.DrillRack
+    cmd.verbs['drillrack'].drillRacks = fpc.drillRacks
+    cmd.verbs['drillrack'].execute('default', warningCallback)
+    # Give the commands access to the Dim() class.
+    cmd.dimClass = fpc.Dim
+    # Commands need access to FootprintException base class in order
+    # to handle FootprintExceptions.
+    cmd.FootprintException = fpc.FootprintException
+    
+def warningsToConsole(msg):
+    "Warning callback that prints to console."
+    print 'Warning:', msg
+    
+######################################################################
+# Main
+args = processArgs()
+if 'a' in args.debug:
+    print 'args:',args
+
+if args.kicad:
+    import plugins.kicadrenderer as pl
+else:
+    import plugins.gedarenderer as pl
+    
+init(warningsToConsole)
+processRc(warningsToConsole)
+
+if args.fp:
+    # Execute fp command from command line arguments.
+    footprint = cmd.verbs['fp'].dispatchPlugin(args.fp[0], warningsToConsole)
+    for ln in footprint.rendering(warningsToConsole):
+        print ln
+elif args.script == None:
+    # No script, so drop into interactive mode.
+    interactive()
+else:
+    # Run script and exit.
+    if os.path.isfile(args.script):
+        batch(args.script)
+    else:
+        print args.script,'not found.'
