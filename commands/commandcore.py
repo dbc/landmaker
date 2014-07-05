@@ -285,17 +285,17 @@ class Cmd_fp(Command):
             yield "  fp ? <plug-in> <parameter ; renders to screen for quick view."
         elif len(longhelp) > 0:
             pu = longhelp.strip()
-            try:
-                self.plugins[pu]
-            except KeyError:
-                print 'No plug-in: ',pu
             if pu == '?':
                 yield "  Available plugins:"
                 for pu in sorted(self.plugins.keys()):
                     yield "    " + pu
             else:
-                for ln in self.plugins[pu].helptext():
-                    yield ln
+                try:
+                    self.plugins[pu]
+                    for ln in self.plugins[pu].helptext():
+                        yield ln
+                except KeyError:
+                    print 'No plug-in: ',pu
         else:
             yield "fp <filename> <plug-in> <parameters>"
 
