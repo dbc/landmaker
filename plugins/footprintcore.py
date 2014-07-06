@@ -1000,6 +1000,9 @@ class Footprint(FPCoreObj):
     def helptext(cls):
         nm = cls.__name__.split('_')[-1]
         yield "No help for " + nm
+    @classmethod
+    def pluginName(cls):
+        return cls.__name__.split('_')[2]
     def rendering(self, warningCallback):
         raise NotImplementedError('Abstract')
 
