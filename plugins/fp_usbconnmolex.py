@@ -41,6 +41,8 @@ class FP_usbconnmolex(fc.Footprint):
         # Pick up general rules
         maskrelief = rules['maskrelief']
         clearanceRule = rules['minspace']
+	# FIXME: add a parameter to select either rule-based clearance,
+	# explicitly set clearance, or default of 12mil.
         clearance = fc.Dim.MIL(12) # eradicate Cu hairs in gEDA/pcb
         # Do type-specific work.
         if kw['type'] == '54819-0519':
