@@ -27,6 +27,22 @@ class Geda_RoundPad(fc.RoundPad):
     @property
     def square(self):
         return False
+    @property
+    def padRadius(self):
+        return self.dia/2.0
+    def tFlags(self, side = 'c'):
+        assert side in 'cs'
+        return 'onsolder' if side == 's' else ''   
+    def smtPad(self, x, y, num, name='', side='c'):
+        yield 'Pad[{0:d} {1:d} {2:d} {3:d} {4:d} {5:d} {6:d} "{7:s}" "{8:d}" "{9:s}"]'.format(\
+            x.gu, y.gu, # x,y of end 1 \
+            x.gu, y.gu, # x,y of end 2 \
+            self.dia.gu, # width of stripe \
+            (2.0*self.clearance).gu, \
+            (2.0*+self.relief+self.dia).gu, \
+            name, \
+            num, \
+            self.tFlags(side))
 
 class Geda_SquarePad(fc.SquarePad):
     @property
@@ -35,16 +51,57 @@ class Geda_SquarePad(fc.SquarePad):
     @property
     def dia(self):
         return self.width # A pcb-ism. This hack simplifies Pin[] rendering.
+    def smtPad(self, x, y, num, name='',  side='c'):
+        assert side in 'cs'
+        return '# <SquarePad as SMT>'
 
-##class Geda_RectPad(fc.RectPad):
-##    def rendering(self, context):
-##        "Context is 'c' or 's' for component or solder side."
-##        pass
-##
-##class Geda_RoundedRectPad(fc.RoundedRectPad):
-##    def rendering(self, context):
-##        "Context is 'c' or 's' for component or solder side."
-##        pass
+class RenderRect_Base(object):
+    @property
+    def padRadius(self):
+        xd = self.x2-self.x1
+        yd = self.y2-self.y1
+        radius = min([xd,yd])/2.0
+        assert radius > 0.0
+        return radius
+    @property
+    def orientation(self):
+        xd = self.x2-self.x1
+        yd = self.y2-self.y1
+        return 'h' if xd > yd else 'v'
+    def smtPad(self, x, y, num, name='', side='c'):
+        radius = self.padRadius
+        if self.orientation == 'h':
+            # horizontal
+            x1 = (self.x1 + radius) + x
+            x2 = (self.x2 - radius) + x
+            y1 = y
+            y2 = y
+        else:
+            # vertical
+            x1 = x
+            x2 = x
+            y1 = (self.y1+radius) + y
+            y2 = (self.y2-radius) + y
+        yield 'Pad[{0:d} {1:d} {2:d} {3:d} {4:d} {5:d} {6:d} "{7:s}" "{8:d}" "{9:s}"]'.format(\
+            x1.gu, y1.gu, # x,y of end 1 \
+            x2.gu, y2.gu, # x,y of end 2 \
+            (2.0*radius).gu, # width of stripe \
+            (2.0*self.clearance).gu, \
+            (2.0*(self.relief+radius)).gu, \
+            name, \
+            num, \
+            self.tFlags(side))
+        
+class Geda_RectPad(RenderRect_Base,fc.RectPad):
+    def tFlags(self, side='c'):
+        assert side in 'cs'
+        return 'square,onsolder' if side=='s' else 'square'
+
+class Geda_RoundedRectPad(RenderRect_Base,fc.RoundedRectPad):
+    def tFlags(self, side='c'):
+        assert side in 'cs'
+        return 'onsolder' if side=='s' else ''
+            
 
 # landmaker pins get classified for rendering to pcb footprint files
 # according to the rendering strategy needed for each pin flavor.
@@ -60,7 +117,7 @@ class Geda_PinGeometry(fc.PinGeometry):
             and (isinstance(self.compPad, fc.RoundPad) \
                 or isinstance(self.compPad, fc.SquarePad))
         topOnly = not self.symmetric and self.solderPad == None
-        botOnly = not self.symmetric and self.topPad == None
+        botOnly = not self.symmetric and self.compPad == None
         return PinClassifiers(drilled, simple, self.symmetric, topOnly, botOnly)
 
 class Geda_PinSpec(fc.PinSpec):
@@ -79,7 +136,7 @@ class Geda_PinSpec(fc.PinSpec):
                 self.x.gu, self.y.gu,  # x,y relative to mark \
                 p.dia.gu,  # pad diameter \
                 (p.clearance * 2.0).gu,  # Cu clearance \
-                (p.dia + p.relief).gu,  # Diameter of mask anti-pad \
+                (p.dia + 2.0*p.relief).gu,  # Diameter of mask anti-pad \
                 self.geo.drill.gu,  # Drill diameter \
                 self.name,  # pin name \
                 self.num,  # pin number \
@@ -89,7 +146,27 @@ class Geda_PinSpec(fc.PinSpec):
             yield '# <render a normal SMT pad>'
         elif cl.drilled and not cl.simple:
             # These require obscure jiggery-pokery in pcb.
-            yield '# <render a complex drilled pad>'
+            yield '# complex drilled pad for pin #{0:d}'.format(self.num)
+            # First, compute a pcb Pin[] element to hold the drill info,
+            # and select a pad diameter that is <= either top or
+            # bottom extents.
+            radius = min([self.geo.solderPad.padRadius, self.geo.compPad.padRadius])
+            yield 'Pin[{0:d} {1:d} {2:d} {3:d} {4:d} {5:d} "{6:s}" "{7:d}" "{8:s}"]'.format( \
+                self.x.gu, self.y.gu,  # x,y relative to mark \
+                (2.0*radius).gu, # pad diameter \
+                0, # Cu clearance comes from Pad[] \
+                0, # mask relief comes from Pad[] \
+                self.geo.drill.gu,  # Drill diameter \
+                self.name,  # pin name \
+                self.num,  # pin number \
+                '')  # no flags
+            # Now put down the pads on each side of the board.
+            for ln in self.geo.compPad.smtPad(self.x, self.y, self.num, self.name):
+                yield ln
+            for ln in self.geo.solderPad.smtPad(self.x, self.y, self.num, self.name,'s'):
+                yield ln
+                
+
         elif not cl.drilled and not (cl.topOnly or cl.botOnly):
             # This is most likely an edge connector.
             yield '# <render edge connector (or similar).'
@@ -127,19 +204,45 @@ class Geda_SilkArc(fc.SilkArc):
         yield '# <silk arc>' # FIXME
 
 
+class Geda_KeepOutRect(fc.KeepOutRect):
+    def rendering(self, warningCallback):
+        yield '# Keep Out'
+        # pcb does not directly support keep-outs.
+        # Construct some silk lines and render the keep-out area that way.'
+        pen = fc.Dim.MIL(10) # FIXME: remove hard=coded silk width, use rule.
+        # Silk line has some width, so offset the lines into the keep-out area.
+        offset = pen/2.0
+        ox1 = self.x1 + offset
+        oy1 = self.y1 + offset
+        ox2 = self.x2 - offset
+        oy2 = self.y2 - offset
+        s = []
+        # Make a box
+        s.append(Geda_SilkLine(ox1, oy1, ox1, oy2, pen))
+        s.append(Geda_SilkLine(ox1, oy2, ox2, oy2, pen))
+        s.append(Geda_SilkLine(ox2, oy2, ox2, oy1, pen))
+        s.append(Geda_SilkLine(ox2, oy1, ox1, oy1, pen))
+        # Put an X in the box
+        s.append(Geda_SilkLine(ox1, oy1, ox2, oy2, pen))
+        s.append(Geda_SilkLine(ox1, oy2, ox2, oy1, pen))        
+        # render the silk
+        for silk in s:
+            for ln in silk.rendering(warningCallback):
+                yield ln
 
 # Define footprint-level gEDA renderer.
 class Geda_Footprint(object):
     roundPad = Geda_RoundPad
     squarePad = Geda_SquarePad
-    #rectPad = Geda_RectPad
-    #roundedRectPad = Geda_RoundedRectPad
+    rectPad = Geda_RectPad
+    roundedRectPad = Geda_RoundedRectPad
     pinGeometry = Geda_PinGeometry
     pinGang = Geda_PinGang
     pinSpec = Geda_PinSpec
     silkText = Geda_SilkText # No such beast in gEDA except for refdes.
     silkLine = Geda_SilkLine
     silkArc = Geda_SilkArc
+    keepOutRect = Geda_KeepOutRect
     _indent = '    '
     def rendering(self, warningCallback):
         # Construct the Element[...] line.
@@ -168,6 +271,10 @@ class Geda_Footprint(object):
                 yield self._indent + ln
         for art in self.silk:
             for ln in art.rendering(warningCallback):
+                yield self._indent + ln
+        # Render keep-outs
+        for ko in self.keepOuts:
+            for ln in ko.rendering(warningCallback):
                 yield self._indent + ln
         # All done!
         yield ')'

@@ -269,7 +269,7 @@ class Cmd_fp(Command):
         try:
             pu = self.plugins[plugin]
         except KeyError:
-            raise CommandSyntax(pu.join(['Plugin ',' not found.']))
+            raise CommandSyntax(plugin.join(['Plugin ',' not found.']))
         try:
             footprint = pu.parse(puParams, rules, rack, warningCallback)
         except FootprintException as e:

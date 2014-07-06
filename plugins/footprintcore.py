@@ -33,7 +33,7 @@ class FootprintException(Exception):
     "Base class for footprint generation exceptions raised by plugins."
     @property
     def msg(self):
-        return "FootprintException: " + self.__class__.__name__
+        return "FootprintException: " + self.__class__.__name__ 
 
 class RuleNotFound(FootprintException):
     @property
@@ -58,6 +58,9 @@ class ParamSyntax(FootprintException):
     @property
     def msg(self):
         return "Parameter syntax error: " + self.args[0]
+
+class InternalError(Exception):
+    pass
 
 #
 # Foundation class.
@@ -213,6 +216,8 @@ class Dim(FPCoreObj):
         return self.__class__(float(other)/self._v, self.du)
     def __neg__(self):
         return self.__class__(-self._v, self.du)
+    def __pos__(self):
+        return self
     def __lt__(self, other):
         return self._v < float(other)
     def __ge__(self, other):
@@ -227,6 +232,8 @@ class Dim(FPCoreObj):
     def __ne__(self, other):
         if other==None: return True
         return self._v != float(other)
+    def __abs__(self):
+        return Dim(abs(self._v), self.du)
         
 class RulesDictionary(dict):
     def __getitem__(self, index):
@@ -529,6 +536,26 @@ class RectPad(Pad):
         self.y1 = ymin
         self.x2 = xmax
         self.y2 = ymax
+    @classmethod
+    def stretch(cls, aPad, xAmount, yAmount):
+        "Constructor, make RectPad by stretching a SquarePad."
+        r = aPad.width/2.0
+        return cls._stretch(r, xAmount, yAmount, aPad.clearance, aPad.relief)
+    @classmethod
+    def _stretch(cls, radius, xAmount, yAmount, clearance, relief):
+        "Implement stretching."
+        assert radius > 0.0
+        if xAmount != 0.0 and yAmount != 0.0:
+            raise InternalError('Can only stretch in one dimension.')
+        if xAmount != 0.0:
+            x1 = -radius + xAmount if xAmount < 0.0 else -radius
+            x2 = radius + xAmount if xAmount > 0.0 else radius
+        else:
+            x1 = -radius
+            x2 = radius
+        y1 = -radius + yAmount if yAmount < 0.0 else -radius
+        y2 = radius + yAmount if yAmount > 0.0 else radius
+        return cls(x1, y1, x2, y2, clearance, relief)
     def reprvals(self):
         return [self.x1, self.y1, self.x2, self.y2, self.clearance, self.relief]
     def __eq__(self, other):
@@ -539,7 +566,7 @@ class RectPad(Pad):
                and self.y2 == other.y2
     def extents(self):
         return [(self.x1, self.y1), (self.x1, self.y2),
-                (self,x2, self.y1), (self, x2, self.y2)]
+                (self.x2, self.y1), (self.x2, self.y2)]
     def covers(self, other):
         for x,y in other.extents():
             if x < self.x1: return False
@@ -551,11 +578,21 @@ class RectPad(Pad):
         "Return minimum copper width if drilled at (0,0) by aDrill."
         return min([abs(self.x1), abs(self.x2), abs(self.y1), abs(self.y2)]) \
                - aDrill
+    @property
+    def roundEnds(self):
+        return False
         
 
 class RoundedRectPad(RectPad):
-    # FIXME: implement specialized extents() and covers()
-    pass
+    # FIXME: implement specialized extents(), covers(), annulus()
+    @classmethod
+    def stretch(cls, aPad, xAmount, yAmount):
+        "Constructor, make RoundedRectPad by stretching a RoundPad."
+        r = aPad.dia/2.0
+        return cls._stretch(r, xAmount, yAmount, aPad.clearance, aPad.relief)
+    @property
+    def roundEnds(self):
+        return True
         
 class PinGeometry(FPCoreObj):
     "PinGeometry is a sub-primitive of the PinSpec primitive."
@@ -737,6 +774,23 @@ class SilkArc(Silk):
             raise ValueError('Arc length must be between 0 and 360.')
         self.arc = arcAngle
 
+class KeepOut(Primitive):
+    "Specification of keep-out areas."
+    pass
+
+class KeepOutRect(KeepOut):
+    "Keep out rectangle."
+    def __init__(self, x1, y1, x2, y2):
+        if not isinstance(x1, Dim) \
+           and isinstance(y1, Dim) \
+           and isinstance(x2, Dim) \
+           and isinstance(y2, Dim):
+            raise TypeError('Keep-out dimentions must be Dim().')
+        self.x1 = min([x1,x2])
+        self.y1 = min([y1,y2])
+        self.x2 = max([x1,x2])
+        self.y2 = max([y1,y2])
+
 #
 # Footprint base classes.
 #
@@ -800,7 +854,9 @@ class Footprint(FPCoreObj):
     refDes = RefDes
     silkLine = SilkLine
     silkArc = SilkArc
-    def __init__(self, description, refdes, pins = [], silk = [], comments = []):
+    keepOutRect = KeepOutRect
+    def __init__(self, description, refdes, pins = [], silk = [], \
+                 comments = [], keepOuts = []):
         self.desc = str(description) if description != None else ''
         assert refdes != None
         if isinstance(refdes, str):
@@ -810,12 +866,13 @@ class Footprint(FPCoreObj):
         self.pins = pins
         self.silk = silk # FIXME: Add type-checking: must be silk primitives
         self.comments = [str(x) for x in comments]
+        self.keepOuts = keepOuts # FIXME: add type-checking
     @property
     def pins(self):
         return self._pins
     @pins.setter
     def pins(self, l):
-        if not min([isinstance(x, PinInfo) for x in l]):
+        if l and not min([isinstance(x, PinInfo) for x in l]):
             raise ValueError('Must be list of PinSpec or PinGang.')
         self._pins = l
     @property
@@ -823,7 +880,7 @@ class Footprint(FPCoreObj):
         return self._silk
     @silk.setter
     def silk(self, l):
-        if not min([isinstance(x, Silk) for x in l]):
+        if l and not min([isinstance(x, Silk) for x in l]):
             raise ValueError('Must be a silk layer art element.')
         self._silk = l
     def reprvals(self):
@@ -851,7 +908,7 @@ class Footprint(FPCoreObj):
                 break
             # Check for '=' and value list.
             vlist = []
-            if tokens[0].type == '=':
+            if tokens[0] != None and tokens[0].type == '=':
                 # Pick up value list.
                 next(tokens) # Consume the '='.
                 while True:
@@ -879,7 +936,7 @@ class Footprint(FPCoreObj):
                         elif units in ['inch','in']:
                             val = Dim.INCH(val)
                         else:
-                            raise FootprintException('Internal error.')
+                            raise InternalError('parseKwargs: Can not convert parameter to type: ' + str(units))
                     else:
                         break
                     vlist.append(val)

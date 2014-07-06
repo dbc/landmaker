@@ -53,7 +53,7 @@ def interactive():
         except EOFError:
             break
         try:
-            cmd.dispatchCommand(ln)
+            cmd.dispatchCommand(ln, warningsToConsole)
         except cmd.CommandSyntax as e:
             print e.args[0]
         except StopIteration:
