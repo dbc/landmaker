@@ -93,13 +93,24 @@ class Dim(FPCoreObj):
     mmPerMil = 0.0254
     validDisplayUnits = frozenset(['mm','mil','inch'])
     def __init__(self, mmValue, displayUnits=None):
-        if isinstance(mmValue,Dim):
-            displayUnits = mmValue.du
-        elif isinstance(mmValue, str):
-            return self.__class__.parse(mmValue)
-        # canonical value is millimeters.
-        self._v = float(mmValue)
-        self.du = displayUnits
+        if displayUnits:
+            self._v = float(mmValue)
+            self.du = displayUnits
+        else:
+            if isinstance(mmValue,str):
+                return self.__class__.fromStr(mmValue)
+            elif isinstance(mmValue,Dim):
+                self._v = mmValue._v
+                self.du = mmValue.du
+            else:
+                raise ValueError('Can not convert to Dim.')
+##        if isinstance(mmValue,Dim):
+##            displayUnits = mmValue.du
+##        elif isinstance(mmValue, str):
+##            return self.__class__.parse(mmValue)
+##        # canonical value is millimeters.
+##        self._v = float(mmValue)
+##        self.du = displayUnits
     def reprvals(self):
         return [self._v, self.du]
     @property
@@ -149,17 +160,14 @@ class Dim(FPCoreObj):
             return cls.MM(v)
         if displayUnits in ['inch','in']:
             return cls.INCH(v)
-        raise ValueError(str(displayUnits) + ' is not a valid display unit.')
+        raise ValueError(repr(displayUnits) + ' is not a valid display unit.')
     @classmethod
-    def parse(cls, s):
-        return cls.fromStr(s, None)
-    @classmethod
-    def fromStr(cls, s, defaultUnits):
+    def fromStr(cls, s, defaultUnits=None):
         "Construct from string consisting of number and unit keyword."
         mo = re.match(r'([0-9.]+)(\s*)(mm|mil|inch|in)?\Z', s.strip())
         if mo:
-            v = mo.group(1)
-            du = mo.group(3) if mo.group(3) != None else defaultUnits
+            v = float(mo.group(1))
+            du = mo.group(3) if mo.group(3) else defaultUnits
             return cls.VU(v,du)
         else:
             raise ValueError(s + ' not convertable to Dim().')
