@@ -85,11 +85,18 @@ class FPCoreObj(object):
     def reprvals(self):
         return []
 
+#
+# Dim -- linear dimension with prefered diplay units
+#
 class Dim(FPCoreObj):
     "Linear dimension carrying along prefered display units."
     mmPerMil = 0.0254
     validDisplayUnits = frozenset(['mm','mil','inch'])
-    def __init__(self, mmValue, displayUnits):
+    def __init__(self, mmValue, displayUnits=None):
+        if isinstance(mmValue,Dim):
+            displayUnits = mmValue.du
+        elif isinstance(mmValue, str):
+            return self.__class__.parse(mmValue)
         # canonical value is millimeters.
         self._v = float(mmValue)
         self.du = displayUnits
@@ -143,6 +150,9 @@ class Dim(FPCoreObj):
         if displayUnits in ['inch','in']:
             return cls.INCH(v)
         raise ValueError(str(displayUnits) + ' is not a valid display unit.')
+    @classmethod
+    def parse(cls, s):
+        return cls.fromStr(s, None)
     @classmethod
     def fromStr(cls, s, defaultUnits):
         "Construct from string consisting of number and unit keyword."
@@ -245,7 +255,118 @@ class Dim(FPCoreObj):
         return self._v != float(other)
     def __abs__(self):
         return Dim(abs(self._v), self.du)
-        
+
+#
+# Point
+#
+class Pt(FPCoreObj):
+    def __init__(self, x, y=None):
+        if y == None:
+            self.x = x[0]
+            self.y = x[1]
+        else:
+            self.x = x
+            self.y = y
+    def reprvals(self):
+        return [self._x, self._y]
+    @property
+    def x(self):
+        return self._x
+    @x.setter
+    def x(self,v):
+        self._x = Dim(v)
+    @property
+    def y(self):
+        return self._y
+    @y.setter
+    def y(self, v):
+        self._y = Dim(v)
+    @classmethod
+    def MM(cls, x, y):
+        return cls(Dim.MM(x), Dim.MM(y))
+    @classmethod
+    def MIL(cls, x, y):
+        return cls(Dim.MIL(x), Dim.MIL(y))
+    @classmethod
+    def INCH(cls, x, y):
+        return cls(Dim.INCH(x), Dim.INCH(y))
+    def order(self, other):
+        return (self, other) if self <= other else (other, self)
+    def spansOrg(self, other):
+        "True if rectangle defined by self,other contains Pt(0,0)."
+        p1,p2 = self.order(other)
+        org = Pt.MM(0,0)
+        return p1 < org and org < p2
+    def leftOf(self, other):
+        return self.x < other.x
+    def rightOf(self, other):
+        return self.x > other.x
+    def below(self, other):
+        return self.y < other.y
+    def above(self, other):
+        return self.y > other.y
+    def alignedx(self, other):
+        return self.x == other.x
+    def alignedy(self, other):
+        return self.y == other.y
+    def area(self, other):
+        return abs(self.x-other.x) * abs(self.y-other.y)
+    def dist(self, other):
+        dv = m.sqrt(float((self.x - other.x))**2.0 + float((self.y-other.y))**2.0)
+        du = self.x.du
+        return Dim(dv,du)
+    def bearing(self, other):
+        raise NotImplementedError('FIXME')
+    @property
+    def reflx(self):
+        "Reflect over X axis."
+        return Pt(self.x, -self.y)
+    @property
+    def refly(self):
+        "Reflect over Y axis."
+        return Pt(-self.x, self.y)
+    def rotate(self, other, pivot=None):
+        raise NotImplementedError('FIXME')
+    # comparisons
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+    def __ne__(self, other):
+        return self.x != other.x or self.y != other.y
+    def __le__(self, other):
+        return self.x <= other.x and self.y <= other.y
+    def __lt__(self, other):
+        # Same as below and to the left of
+        return self.x < other.x and self.y < other.y
+    def __ge__(self, other):
+        return self.x >= other.x and self.y >= other.y
+    def __gt__(self, other):
+        # Same as: above and to the right of
+        return self.x > other.x and self.y > other.y
+    # arithmetic
+    # add/subtract points.
+    def __add__(self, other):
+        return Pt(self.x + other.x, self.y + other.y)
+    def __sub__(self, other):
+        return Pt(self.x - other.x, self.y - other.y)
+    def __neg__(self):
+        return Pt(-self.x, -self.y)
+    def __pos__(self):
+        return Pt(self.x, self.y)
+    # Multiply/divide point by a scalar (float or Dim)
+    def __mul__(self, other):
+        m = float(other)
+        return Pt(self.x*m, self.y*m)
+    def __rmul__(self, other):
+        return self.__mul__(other)
+    def __div__(self, other):
+        m = float(other)
+        return Pt(self.x/m, self.y/m)
+    # __rdiv__ is non-sensical
+
+    
+#
+# Rules Dictionary
+#
 class RulesDictionary(dict):
     def __getitem__(self, index):
         try:
