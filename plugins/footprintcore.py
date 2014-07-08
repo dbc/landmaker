@@ -26,6 +26,17 @@ from lookaheadtools import LinesOf
 
 debug = ''
 
+from inspect import stack,getframeinfo
+def trace(name, globalVars, localVars=None):
+    callerFrameRecord = stack()[1]
+    info = getframeinfo(callerFrameRecord[0])
+    try:
+        v = localVars[name]
+    except (TypeError,KeyError):
+        v = globalVars[name]
+    print '{0:s} = {1:s} ({info.filename}:{info.function}@{info.lineno})'.format(name, repr(v),info=info)
+
+
 #
 # Exceptions
 #

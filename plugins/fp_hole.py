@@ -70,6 +70,8 @@ class FP_hole(fc.Footprint):
         # Pick up general rules
         maskrelief = rules['maskrelief']
         clearance = rules['minspace']
+        if 't' in fc.debug:
+            fc.trace('maskrelief',globals(),locals())
         # Generate the pin.
         try:
             fit = kw['fit']
