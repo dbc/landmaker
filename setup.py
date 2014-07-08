@@ -38,7 +38,7 @@ setup(
     packages=['commands','plugins'],
     scripts=['landmaker'],
     install_requires=['lookaheadtools','tokenizertools'],
-    #test_suite='tests',
+    test_suite='tests',
 )
 
 
