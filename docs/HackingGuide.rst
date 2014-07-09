@@ -40,6 +40,14 @@ variables inherited from base classes, and not instantiated
 directly.  This allows the rendering back-end to sub-class
 the primitives.
 
+A plug-in *should* define the constructor ``@classmethod fromKwargs()``
+which is exported via the scripting interface in addition to
+``parse()``.
+In most cases, this is easily accomplished by letting ``parse()``
+return via ``fromKwargs()`` after turning the parameter string
+into a validated keyword argument dictionary.
+
+
 Implementing a Renderer
 -----------------------
 
@@ -62,3 +70,9 @@ Short form how-to:
   provided here. (If necessary, the rendering-FP_<name> class can
   be created explicitly; the plug-in loader only supplies missing
   definitions.)
+
+Using the Scripting Interface
+-----------------------------
+
+TBW -- probably needs it's own document.
+
