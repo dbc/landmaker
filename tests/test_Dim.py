@@ -28,7 +28,7 @@ class TestDim(ut.TestCase):
         self.assertTrue(self.mm1mm < self.mm2mm)
         self.assertFalse(self.inch1inch < self.mm1mm)
         self.assertTrue(self.mm1mm < 2.0)
-        self.assertFalse(self.inch1inch < 5.0)
+        self.assertTrue(self.inch1inch < 5.0)
         self.assertTrue(1.0 < self.mm2mm)
         self.assertFalse(50.0 < self.inch1inch)
 
@@ -36,7 +36,7 @@ class TestDim(ut.TestCase):
         self.assertFalse(self.mm1mm >= self.mm2mm)
         self.assertTrue(self.inch1inch >= self.mm1mm)
         self.assertFalse(self.mm1mm >= 2.0)
-        self.assertTrue(self.inch1inch >= 5.0)
+        self.assertTrue(self.inch1inch >= 0.5)
         self.assertFalse(1.0 >= self.mm2mm)
         self.assertTrue(50.0 >= self.inch1inch)
         self.assertTrue(self.mm1mm >= 1.0)

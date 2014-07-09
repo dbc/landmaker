@@ -48,9 +48,9 @@ class Geda_SquarePad(fc.SquarePad):
     @property
     def square(self):
         return True
-    @property
-    def dia(self):
-        return self.width # A pcb-ism. This hack simplifies Pin[] rendering.
+##    @property
+##    def dia(self):
+##        return self.width # A pcb-ism. This hack simplifies Pin[] rendering.
     def smtPad(self, x, y, num, name='',  side='c'):
         assert side in 'cs'
         return '# <SquarePad as SMT>'

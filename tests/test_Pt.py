@@ -90,6 +90,9 @@ class TestPt(ut.TestCase):
         self.assertFalse(self.p1.spansOrg(self.p2))
         self.assertTrue((-self.p1).spansOrg(self.p2))
 
+    def test_19repr(self):
+        self.assertTrue(repr(self.p1)=="Pt(Dim(1.0,'mm'),Dim(1.0,'mm'))")
+
 
 if __name__ == '__main__':
     ut.main()

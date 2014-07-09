@@ -98,7 +98,9 @@ class Dim(FPCoreObj):
             self.du = displayUnits
         else:
             if isinstance(mmValue,str):
-                return self.__class__.fromStr(mmValue)
+                t = self.__class__.fromStr(mmValue)
+                self._v = t._v
+                self.du = t.du
             elif isinstance(mmValue,Dim):
                 self._v = mmValue._v
                 self.du = mmValue.du
@@ -227,14 +229,26 @@ class Dim(FPCoreObj):
         return int(self._v)
     def __float__(self):
         return self._v
+    def _scale(self, other):
+        if isinstance(other,Dim):
+            # Cool, already a Dim()
+            return float(other)
+        try:
+            # Can it be made into a dim? (Perhaps it is a '3mm' style str...
+            o = Dim(other)
+        except ValueError:
+            # If it's a scalar, match it to my units.
+            o = self.__class__.VU(float(other),self.du)
+        return float(o)
     def __add__(self, other):
-        return self.__class__(self._v + float(other), self.du)
+        #return self.__class__(self._v + float(other), self.du)
+        return self.__class__(self._v + self._scale(other), self.du)
     def __radd__(self, other):
         return self.__add__(other)
     def __sub__(self, other):
-        return self.__class__(self._v - float(other), self.du)
+        return self.__class__(self._v - self._scale(other), self.du)
     def __rsub__(self, other):
-        return self.__class__(float(other)-self._v, self.du)
+        return self.__class__(self._scale(other)-self._v, self.du)
     def __mul__(self, other):
         return self.__class__(self._v * float(other), self.du)
     def __rmul__(self, other):
@@ -248,19 +262,19 @@ class Dim(FPCoreObj):
     def __pos__(self):
         return self
     def __lt__(self, other):
-        return self._v < float(other)
+        return self._v < self._scale(other)
     def __ge__(self, other):
-        return self._v >= float(other)
+        return self._v >= self._scale(other)
     def __le__(self, other):
-        return self._v <= float(other)
+        return self._v <= self._scale(other)
     def __gt__(self, other):
-        return self._v > float(other)
+        return self._v > self._scale(other)
     def __eq__(self, other):
         if other==None: return False
-        return self._v == float(other)
+        return self._v == self._scale(other)
     def __ne__(self, other):
         if other==None: return True
-        return self._v != float(other)
+        return self._v != self._scale(other)
     def __abs__(self):
         return Dim(abs(self._v), self.du)
 
@@ -370,7 +384,10 @@ class Pt(FPCoreObj):
         m = float(other)
         return Pt(self.x/m, self.y/m)
     # __rdiv__ is non-sensical
-
+    # Other ops
+    def __len__(self):
+        # FIXME: Add test case
+        return self.dist(Pt.MM(0,0))
     
 #
 # Rules Dictionary
@@ -564,28 +581,55 @@ class NoRack(DrillRack):
 #
 class Primitive(FPCoreObj):
     "Footprints must consist entirely of primitives."
-    def __init__(self, x, y, displayUnits=None):
-        du = Dim.guessDu([x,y],displayUnits)
-        self.x = Dim.OrZero(x,du)
-        self.y = Dim.OrZero(y,du)
+    def __init__(self, loc):
+        self.loc = loc
     def reprvals(self):
-        return [self.x, self.y]
+        return [self._loc]
+    @property
+    def loc(self):
+        return self._loc
+    @loc.setter
+    def loc(self, v):
+        if not isinstance(v,Pt):
+            raise TypeError('Location must be a Pt().')
+        self._loc = v
 
 class Pad(FPCoreObj):
     "Pads are sub-prititives of the PinGeometry sub-primitive."
-    def __init__(self, clearance, maskRelief, displayUnits=None):
-        du = Dim.guessDu([clearance, maskRelief], displayUnits)
-        self.clearance = Dim.OrZero(clearance,du)
-        self.relief = Dim.OrZero(maskRelief,du)
+    def __init__(self, clearance, maskRelief):
+        self.clearance = clearance
+        self.maskRelief = maskRelief
+    def reprvals(self):
+        return [self.clearance, self.maskRelief]
+    @property
+    def clearance(self):
+        return self._clearance
+    @clearance.setter
+    def clearance(self, v):
+        dv = Dim(v)
+        if dv < 0:
+            raise ValueError('Clearance must be >= zero.')
+        self._clearance = dv
+    @property
+    def maskRelief(self):
+        return self._relief
+    @maskRelief.setter
+    def maskRelief(self, v):
+        dv = Dim(v)
+        if dv < 0:
+            # FIXME: What about tenting??? Maybe should allow
+            # relief down to -dia/2 -- will need to delgate check to subclasses.
+            raise ValueError('Mask relief must be >= zero.')
+        self._relief = dv
     def __eq__(self, other):
         return self.__class__ == other.__class__ \
                and self.clearance == other.clearance \
-               and self.relief == other.relief
+               and self.maskRelief == other.maskRelief
     def covers(self, other):
         "Returns True if self covers other pad."
         raise NotImplementedError('Abstract')
     def extents(self):
-        "Returns list of (x,y) tuples to be checked by cover()."
+        "Returns list of Pt()'s to be checked by cover()."
         raise NotImplementedError('Abstract')
     def annulus(self, aDrill):
         "Return minimum copper width if drilled at (0,0) by aDrill."
@@ -598,67 +642,82 @@ class Pad(FPCoreObj):
 class RoundPad(Pad):
     def __init__(self, diameter, clearance, maskRelief):
         Pad.__init__(self, clearance, maskRelief)
-        if not (isinstance(diameter, Dim)): 
-            raise TypeError ('Expected Dim().')
-        if diameter <= 0.0:
-            raise ValueError ('Diameter must be > 0.')
         self.dia = diameter
+    @property
+    def dia(self):
+        return self._dia
+    @dia.setter
+    def dia(self, v):
+        dv = Dim(v)
+        if dv <= 0.0:
+            raise ValueError ('Diameter must be > 0.')
+        self._dia = dv        
     def reprvals(self):
-        return [self.dia, self.clearance, self.relief]
+        return [self.dia, self.clearance, self.maskRelief]
     def __eq__(self, other):
         return super(RoundPad,self).__eq__(other) \
                and self.dia == other.dia
     def extents(self):
         # Aproximate the extents by 8 points around the circle.
         w2 = self.dia/2.0
-        l = [(w2,0), (-w2, 0), (0, w2), (0,-w2)]
+        du = w2.du
+        l = [Pt(w2,Dim(0,du)), Pt(-w2, Dim(0,du)),
+             Pt(Dim(0,du), w2), Pt(Dim(0,du),-w2)]
         r = w2 * 0.707
-        l.extend([(r,r),(r,-r),(-r,r),(-r,-r)])
+        print 'w2,r',w2,r
+        l.extend([Pt(r,r),Pt(r,-r),Pt(-r,r),Pt(-r,-r)])
         return l
     def covers(self, other):
         if isinstance(other, RoundPad):
             return self.dia >= other.dia
         r = self.dia / 2.0
-        for x,y in other.extents():
-            if m.sqrt(x**2.0 + y**2.0) > r:
+        for p in other.extents():
+            if len(p) > r:
                 return False
         return True
     def annulus(self, aDrill):
         "Return minimum copper width if drilled at (0,0) by aDrill."
-        return self.dia - aDrill
+        return (self.dia - aDrill)/2.0
 
 class SquarePad(Pad):
     def __init__(self, width, clearance, maskRelief):
         Pad.__init__(self, clearance, maskRelief)
-        if not (isinstance(width, Dim)):
-            raise TypeError('Expected Dim().')
-        if width <= 0.0:
-            raise ValueError('Width must be > 0.')
         self.width = width
     def reprvals(self):
         return [self.width, self.clearance, self.relief]
+    @property
+    def width(self):
+        return self._width
+    @width.setter
+    def width(self, v):
+        w = Dim(v)
+        if w < 0.0:
+            raise ValueError('Width must be > 0.')
+        self._width = w
+    @property
+    def dia(self):
+        # symnonym for width
+        return self.width
     def __eq__(self, other):
         return super(SquarePad,self).__eq__(other) \
                and self.width == other.width
     def extents(self):
         w2 = self.width/2.0
-        return [(w2,w2), (w2,-w2), (-w2, w2), (-w2,-w2)]
+        return [Pt(-w2,-w2), Pt(w2,-w2), Pt(-w2, w2), Pt(w2,w2)]
     def covers(self, other):
         if isinstance(other, SquarePad):
             return self.width >= other.width
         if isinstance(other, RoundPad):
             return self.width >= other.dia
         w2 = self.width/2.0
-        xmin, xmax, ymin, ymax = -w2, w2, -w2, w2
-        for x,y in other.extents():
-            if x < xmin: return False
-            if x > xmax: return False
-            if y < ymin: return False
-            if y > ymin: return False
+        ll,ur = Pt(-w2,-w2),Pt(w2,w2)
+        for p in other.extents():
+            if p.leftOf(ll) or p.below(ll) or p.rightOf(ur) or p.above(ur):
+                return False
         return True
     def annulus(self, aDrill):
         "Return minimum copper width if drilled at (0,0) by aDrill."
-        return self.width - aDrill
+        return (self.width - aDrill)/2.0
         
 
 class RectPad(Pad):
@@ -678,6 +737,7 @@ class RectPad(Pad):
         self.y2 = ymax
     @classmethod
     def stretch(cls, aPad, xAmount, yAmount):
+        # FIXME: pass in one or two points for double-ended offset.
         "Constructor, make RectPad by stretching a SquarePad."
         r = aPad.width/2.0
         return cls._stretch(r, xAmount, yAmount, aPad.clearance, aPad.relief)
@@ -1279,43 +1339,6 @@ def collectPlugins(aModuleDict):
     return plugins
 
 if __name__ == '__main__':
-    rd = RulesDictionary()
-    rd['foo'] = Dim.MM(7)
-    print rd['foo']
-##    print rd['bar']
-    t = Dim.MIL(30)
-    print repr(t)
-    print t.gu
-    t = Dim.INCH(1)
-    print t.mm
-    print t.inch
-    print repr(t)
-    print repr(Dim.MIL('30'))
-    print '--drill--'
-    dr = DrillRack()
-    print dr
-    print dr[Dim.INCH(0.044)].mil
-    dr.addDrill(Dim.INCH(0.125))
-    print dr
-    dr.addDrill(Dim.INCH(0.052))
-    print dr
-    print dr[Dim.INCH(0.044)].mil
-    print dr[Dim.INCH(0.25)].mil
-    nodr = NoRack()
-    print 'nodr:',nodr[Dim.INCH(0.022)],nodr['#76']
-    d31 = Dim.DRILL('#31')
-    print '#31 drill:',d31
-    print '===pads==='
-    p1 = RoundPad(Dim.MIL('30'),Dim.MIL('8'),Dim.MIL('4'))
-    print p1
-    print p1 == p1
-    p2 = RoundPad(Dim.MIL('30'),Dim.MIL('8'),Dim.MIL('2'))
-    print p2
-    print p1 == p2
-    p3 = SquarePad(Dim.MIL('30'),Dim.MIL('8'),Dim.MIL('2'))
-    print p2 == p3
-    print p3.extents()
-    
-    
+    pass
     
 
