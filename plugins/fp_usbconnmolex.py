@@ -19,6 +19,9 @@
 # Footprints for:
 # Molex throughhole: USB mini-AB receptical 54819-0519
 
+# FIXME:
+# check min annulus rule carefully
+
 import footprintcore as fc
 import datetime as dt
 
@@ -62,9 +65,15 @@ class FP_usbconnmolex(fc.Footprint):
             else:
                 ioDrill = rackDrill
             mountDrill = rack[fc.Dim.MM(1.9)]
-            stretchBy = fc.Dim.MM(1.65) - ioTopPad.dia
-            ioBotPadL = cls.roundedRectPad.stretch(ioTopPad,-stretchBy, 0)
-            ioBotPadR = cls.roundedRectPad.stretch(ioTopPad, stretchBy, 0)
+            # Make bot I/O pads by stretching.
+            stretch_by = fc.Dim.MM(1.65) - ioTopPad.dia
+            ioBotPadL = cls.roundedRectPad.fromPad(ioTopPad)
+            ioBotPadL.stretch(stretch_by,  '-x')
+            ioBotPadR = cls.roundedRectPad.fromPad(ioTopPad)
+            ioBotPadR.stretch(stretch_by,  '+x')
+##            stretchBy = fc.Dim.MM(1.65) - ioTopPad.dia
+##            ioBotPadL = cls.roundedRectPad.stretch(ioTopPad,-stretchBy, 0)
+##            ioBotPadR = cls.roundedRectPad.stretch(ioTopPad, stretchBy, 0)
             mountPad = cls.roundPad(fc.Dim.MM(2.7), clearanceRule, maskrelief)
             # Construct Pin geometries
             ioLGeo = cls.pinGeometry(ioTopPad, ioDrill, ioBotPadL)
@@ -75,36 +84,35 @@ class FP_usbconnmolex(fc.Footprint):
             pinLy = fc.Dim.MM(0.8)
             zero = fc.Dim.MM(0)
             pinSpecs = []
-            pinSpecs.append(cls.pinSpec(zero,-2*pinLy,1,ioRGeo))
-            pinSpecs.append(cls.pinSpec(pinLx,-pinLy,2,ioLGeo))
-            pinSpecs.append(cls.pinSpec(zero,zero,3,ioRGeo))
-            pinSpecs.append(cls.pinSpec(pinLx,pinLy,4,ioLGeo))
-            pinSpecs.append(cls.pinSpec(zero,2*pinLy,5,ioRGeo))
+            pinSpecs.append(cls.pinSpec(fc.Pt(zero,2*pinLy),1,ioRGeo))
+            pinSpecs.append(cls.pinSpec(fc.Pt(pinLx,pinLy),2,ioLGeo))
+            pinSpecs.append(cls.pinSpec(fc.Pt(zero,zero),3,ioRGeo))
+            pinSpecs.append(cls.pinSpec(fc.Pt(pinLx,-pinLy),4,ioLGeo))
+            pinSpecs.append(cls.pinSpec(fc.Pt(zero,-2*pinLy),5,ioRGeo))
             # Mounting pins become pins 6 & 7 for "hardware" connection.
-            mntX = fc.Dim.MM(-5.05)
-            mntY = fc.Dim.MM(7.3/2.0)
-            pinSpecs.append(cls.pinSpec(mntX,-mntY,6,mntGeo))                            
-            pinSpecs.append(cls.pinSpec(mntX, mntY,7,mntGeo))
+            mntPt = fc.Pt.MM(-5.05, 7.3/2.0)
+##            mntX = fc.Dim.MM(-5.05)
+##            mntY = fc.Dim.MM(7.3/2.0)
+            pinSpecs.append(cls.pinSpec(mntPt,6,mntGeo))                            
+            pinSpecs.append(cls.pinSpec(mntPt.reflox,7,mntGeo))
             # Keep-outs
             keepOuts = []
-            keepOuts.append(cls.keepOutRect(fc.Dim.MM(-1.8),-fc.Dim.MM(3),\
-                                            fc.Dim.MM( 0.7),-fc.Dim.MM(4.4)))
-            keepOuts.append(cls.keepOutRect(fc.Dim.MM(-1.8), fc.Dim.MM(3),\
-                                            fc.Dim.MM( 0.7), fc.Dim.MM(4.4)))
+            keepOuts.append(cls.keepOutRect(fc.Pt.MM(-1.8, 3), fc.Pt.MM( 0.7, 4.4)))
+            keepOuts.append(cls.keepOutRect(fc.Pt.MM(-1.8, -4.4), fc.Pt.MM( 0.7, -3)))
 ##            keepOuts.append(cls.keepOutRect(fc.Dim.MM(-6.8), fc.Dim.MM(3.1),\
 ##                                            fc.Dim.MM(-5.6),-fc.Dim.MM(3.1)))
-            keepOuts.append(cls.keepOutRect(fc.Dim.MM(-6.8), fc.Dim.MM(3.0),\
-                                            fc.Dim.MM(-6.4),-fc.Dim.MM(3.0)))
-            keepOuts.append(cls.keepOutRect(fc.Dim.MM(-6.4), fc.Dim.MM(2.2),\
-                                            fc.Dim.MM(-5.6),-fc.Dim.MM(2.2)))
+            keepOuts.append(cls.keepOutRect(fc.Pt.MM(-6.8, 3.0),\
+                                            fc.Pt.MM(-6.4,-3.0)))
+            keepOuts.append(cls.keepOutRect(fc.Pt.MM(-6.4, 2.2),\
+                                            fc.Pt.MM(-5.6,-2.2)))
         else:
             raise fc.ParamSyntax(str(kw['type']).join(["Unkown type: ","'"]))
         # Make comments
         cmt = cls.standardComments(cls.__name__.split('_')[2],
-            kw, kwspecs, rules,
+            kw, rules,
             ['maskrelief','minspace','minannulus','refdessize'])
         cmt.append('Pins 6 & 7 are case.')
         # Create the refdes, description, and footprint instance.
-        rd = cls.refDes(0,fc.Dim.MM(2),0, rules['minsilk'], '', rules['refdessize'])
+        rd = cls.refDes(fc.Pt.MM(0,2),0, rules['minsilk'], '', rules['refdessize'])
         desc = 'Molex ' + kw['type'] + ' USB connector.'
         return cls(desc, rd, pinSpecs, [], cmt, keepOuts) 

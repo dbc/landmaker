@@ -47,8 +47,8 @@ class TestPt(ut.TestCase):
         self.assertTrue(self.p4 == self.p5)
         
     def test_08reflections(self):
-        self.assertTrue(self.p1.reflx == fc.Pt.MM(1,-1))
-        self.assertTrue(self.p1.refly == fc.Pt.MM(-1,1))
+        self.assertTrue(self.p1.reflox == fc.Pt.MM(1,-1))
+        self.assertTrue(self.p1.refloy == fc.Pt.MM(-1,1))
         self.assertTrue(-self.p1 == fc.Pt.MM(-1,-1))
 
     def test_09ne(self):

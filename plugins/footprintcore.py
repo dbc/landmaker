@@ -104,8 +104,10 @@ class Dim(FPCoreObj):
             elif isinstance(mmValue,Dim):
                 self._v = mmValue._v
                 self.du = mmValue.du
+            elif mmValue == None:
+                return None # FIXME: add unit test
             else:
-                raise ValueError('Can not convert to Dim.')
+                raise ValueError(' '.join(['Can not convert',repr(mmValue),repr(displayUnits),'to Dim.']))
 ##        if isinstance(mmValue,Dim):
 ##            displayUnits = mmValue.du
 ##        elif isinstance(mmValue, str):
@@ -220,6 +222,11 @@ class Dim(FPCoreObj):
     @gu.setter
     def gu(self, v):
         self.mil = (float(v) / 100.0)
+    @property
+    def u0(self):
+        "Return a zero with same units."
+        # FIXME: add unit tests
+        return self.__class__(0.0, self.du)
     # Arithmetic operators can take two Dim() instances, or
     # one Dim() and one float()'able operand.  Display units are
     # taken from the left-hand operand in the case of two Dim()'s.
@@ -283,14 +290,22 @@ class Dim(FPCoreObj):
 #
 class Pt(FPCoreObj):
     def __init__(self, x, y=None):
+        # In all cases below, we depend on the x.setter, y.setter to call Dim()
         if y == None:
-            self.x = x[0]
-            self.y = x[1]
+            # try to unpack an iterable, let exception bubble up.
+            self.x, self.y = x
         else:
             self.x = x
             self.y = y
     def reprvals(self):
         return [self._x, self._y]
+    def __str__(self):
+        return 'Pt:'+str(self.x)+','+str(self.y)
+    def __getitem__(self, index):
+        # This enables __init__() to be a copy constructor.
+        if index==0: return self.x
+        if index==1: return self.y
+        raise StopIteration
     @property
     def x(self):
         return self._x
@@ -314,9 +329,18 @@ class Pt(FPCoreObj):
         return cls(Dim.INCH(x), Dim.INCH(y))
     def order(self, other):
         return (self, other) if self <= other else (other, self)
+    def rectify(self,  other):
+        "Returns tuple (p1,p2) where x,y are swizzled to guarantee ll,ur rectangle."
+        if self.x == other.x or self.y == other.y:
+            raise ValueError("Points do not form rectangle.")
+        xs = [self.x,  other.x]
+        ys = [self.y,  other.y]
+        p1 = self.__class__(min(xs), min(ys))
+        p2 = self.__class__(max(xs), max(ys))
+        return p1, p2
     def spansOrg(self, other):
         "True if rectangle defined by self,other contains Pt(0,0)."
-        p1,p2 = self.order(other)
+        p1,p2 = self.rectify(other)
         org = Pt.MM(0,0)
         return p1 < org and org < p2
     def leftOf(self, other):
@@ -340,19 +364,31 @@ class Pt(FPCoreObj):
     def bearing(self, other):
         raise NotImplementedError('FIXME')
     @property
-    def reflx(self):
+    def onAxis(self):
+        "True if on either X or Y axis."
+        # FIXME: write unit test
+        return self.x == 0.0 or self.y == 0.0
+    @property
+    def reflox(self):
         "Reflect over X axis."
         return Pt(self.x, -self.y)
     @property
-    def refly(self):
+    def refloy(self):
         "Reflect over Y axis."
         return Pt(-self.x, self.y)
+    def minSpan(self, other):
+        a,b = self.rectify(other)
+        return Dim(min([b.x-a.x, b.y-a.y]), self.x.du)
     def rotate(self, other, pivot=None):
         raise NotImplementedError('FIXME')
     # comparisons
     def __eq__(self, other):
+        if other==None:
+            return False
         return self.x == other.x and self.y == other.y
     def __ne__(self, other):
+        if other==None:
+            return True
         return self.x != other.x or self.y != other.y
     def __le__(self, other):
         return self.x <= other.x and self.y <= other.y
@@ -590,6 +626,7 @@ class Primitive(FPCoreObj):
         return self._loc
     @loc.setter
     def loc(self, v):
+        # FIXME: Perhasps should just call Pt() constructor, let it throw exception.
         if not isinstance(v,Pt):
             raise TypeError('Location must be a Pt().')
         self._loc = v
@@ -619,6 +656,8 @@ class Pad(FPCoreObj):
         if dv < 0:
             # FIXME: What about tenting??? Maybe should allow
             # relief down to -dia/2 -- will need to delgate check to subclasses.
+            # or add a lower-limit property to subclass -- but have an __init__()
+            # order issue in that case.
             raise ValueError('Mask relief must be >= zero.')
         self._relief = dv
     def __eq__(self, other):
@@ -664,7 +703,6 @@ class RoundPad(Pad):
         l = [Pt(w2,Dim(0,du)), Pt(-w2, Dim(0,du)),
              Pt(Dim(0,du), w2), Pt(Dim(0,du),-w2)]
         r = w2 * 0.707
-        print 'w2,r',w2,r
         l.extend([Pt(r,r),Pt(r,-r),Pt(-r,r),Pt(-r,-r)])
         return l
     def covers(self, other):
@@ -684,13 +722,14 @@ class SquarePad(Pad):
         Pad.__init__(self, clearance, maskRelief)
         self.width = width
     def reprvals(self):
-        return [self.width, self.clearance, self.relief]
+        return [self.width, self.clearance, self.maskRelief]
     @property
     def width(self):
         return self._width
     @width.setter
     def width(self, v):
         w = Dim(v)
+        print 'Quarepad w:',w
         if w < 0.0:
             raise ValueError('Width must be > 0.')
         self._width = w
@@ -721,78 +760,105 @@ class SquarePad(Pad):
         
 
 class RectPad(Pad):
-    def __init__(self, x1, y1, x2, y2, clearance, maskRelief, displayUnits=None):
-        du = Dim.guessDu([x1,y1,x2,y2,clearance,maskRelief],displayUnits)
+    def __init__(self, p1, p2, clearance, maskRelief):
         Pad.__init__(self, clearance, maskRelief)
-        # extents() and covers() depend on canonicalizing value orders.
-        xmin = min([x1, x2])
-        xmax = max([x1, x2])
-        ymin = min([y1, y2])
-        ymax = max([y1, y2])
-        if xmin >= 0.0 or xmax <= 0.0 or ymin >= 0.0 or ymax <= 0.0:
-            raise ValueError('Pad must surround (0,0).')
-        self.x1 = xmin
-        self.y1 = ymin
-        self.x2 = xmax
-        self.y2 = ymax
-    @classmethod
-    def stretch(cls, aPad, xAmount, yAmount):
-        # FIXME: pass in one or two points for double-ended offset.
-        "Constructor, make RectPad by stretching a SquarePad."
-        r = aPad.width/2.0
-        return cls._stretch(r, xAmount, yAmount, aPad.clearance, aPad.relief)
-    @classmethod
-    def _stretch(cls, radius, xAmount, yAmount, clearance, relief):
-        "Implement stretching."
-        assert radius > 0.0
-        if xAmount != 0.0 and yAmount != 0.0:
-            raise InternalError('Can only stretch in one dimension.')
-        if xAmount != 0.0:
-            x1 = -radius + xAmount if xAmount < 0.0 else -radius
-            x2 = radius + xAmount if xAmount > 0.0 else radius
+        # FIXME: Should call Pt() constructors? or type check?
+        if p1.spansOrg(p2):
+            self.ll,self.ur = p1.rectify(p2)
         else:
-            x1 = -radius
-            x2 = radius
-        y1 = -radius + yAmount if yAmount < 0.0 else -radius
-        y2 = radius + yAmount if yAmount > 0.0 else radius
-        return cls(x1, y1, x2, y2, clearance, relief)
+            raise ValueError('Pad must surround (0,0).')
+    @classmethod
+    def fromLWO(cls, length, width, clearance, maskRelief, orientation = 'h'):
+        "Construct from length, width, and orientation."
+        l = Dim(length)
+        w = Dim(width)
+        if orientation not in 'hv':
+            raise ValueError("Orientation must be 'h' or 'v'.")
+        x,y = (l/2,w/2) if orientation == 'h' else (w/2,l/2)
+        return cls(Pt(-x,-y),Pt(x,y), clearance, maskRelief)
+    @classmethod
+    def fromPad(cls, aPad):
+        "Construct RectPad from a SquarePad."
+        w = aPad.width
+        p1,p2 = Pt(-w,-w),Pt(w,w)
+        return cls(p1, p2, aPad.clearance, aPad.maskRelief)
+    def stretch(self, amount,  direction): 
+        "Stretch the pad in given direction."
+        try:
+            amt = abs(Dim(amount) )
+        except ValueError:
+            # Hmmm... well... get a bigger hammer and try again.
+            amt = abs(Dim(float(amount), self.loc.du))
+        zero = amt.u0
+        if direction in ['x', '+x']:
+            self.ur += Pt(amt, zero)
+        elif direction == '-x':
+            self.ll -= Pt(amt, zero)
+        elif direction in ['y', '+y']:
+            self.ur += Pt(zero, amt)
+        elif direction == '-y':
+            self.ll -= Pt(zero, amt)
+        else:
+            raise ValueError('Stretch direction must be one of: x,+x,-x,y,+y,-y')
     def reprvals(self):
-        return [self.x1, self.y1, self.x2, self.y2, self.clearance, self.relief]
+        return [self.ll, self.ur , self.clearance, self.maskRelief]
     def __eq__(self, other):
         return super(RectPad,self).__eq__(other) \
-               and self.x1 == other.x1 \
-               and self.x2 == other.x2 \
-               and self.y1 == other.y1 \
-               and self.y2 == other.y2
+               and self.ll == other.ll \
+               and self.ur == other.ur
     def extents(self):
-        return [(self.x1, self.y1), (self.x1, self.y2),
-                (self.x2, self.y1), (self.x2, self.y2)]
+        return [self.ll, self.ur,
+                pt(self.ll.x, self.ur.y), pt(self.ur.x, self.ll.y)]
     def covers(self, other):
-        for x,y in other.extents():
-            if x < self.x1: return False
-            if x > self.x2: return False
-            if y < self.y1: return False
-            if y > self.y2: return False
+        for p in other.extents():
+            if p.leftOf(self.ll): return False
+            if p.below(self.ll): return False
+            if p.rightOf(self.ur): return False
+            if p.above(self.ur): return False
         return True
     def annulus(self, aDrill):
         "Return minimum copper width if drilled at (0,0) by aDrill."
-        return min([abs(self.x1), abs(self.x2), abs(self.y1), abs(self.y2)]) \
-               - aDrill
-    @property
-    def roundEnds(self):
-        return False
+        return min([abs(self.ll.x), abs(self.ll.y), abs(self.ur.x), abs(self.ur.y)]) \
+               - aDrill/2.0
+##    @property
+##    def roundEnds(self):
+##        return False
         
 
 class RoundedRectPad(RectPad):
+    def __init__(self, p1, p2, clearance, maskRelief, radius=None):
+        RectPad.__init__(self, p1, p2, clearance, maskRelief)
+        self.radius = radius
+    # FIXME: needs constructor LWRO
     # FIXME: implement specialized extents(), covers(), annulus()
     @classmethod
-    def stretch(cls, aPad, xAmount, yAmount):
-        "Constructor, make RoundedRectPad by stretching a RoundPad."
-        r = aPad.dia/2.0
-        return cls._stretch(r, xAmount, yAmount, aPad.clearance, aPad.relief)
+    def fromPad(cls, aPad):
+        radius = aPad.dia/2.0
+        p = Pt(radius, radius)
+        return cls(p,  -p,  aPad.clearance,  aPad.maskRelief, radius)
+    @classmethod
+    def fromRectPad(cls,  rectPad, radius=None):
+        return cls(rectPad.ll, rectPad.ur, rectPad.clearance,
+                   rectPad.maskRelief, radius)
+##    @classmethod
+##    def stretch(cls, aPad, stretch):
+##        "Constructor, make RoundedRectPad by stretching a RoundPad."
+##        t = RectPad.stretch(cls, aPad, stretch)
+##        t.radius = aPad.dia/2.0
+##        return t
     @property
-    def roundEnds(self):
-        return True
+    def radius(self):
+        return self._radius
+    @radius.setter
+    def radius(self, v):
+        r = Dim(v)
+        halfSpan = self.ll.minSpan(self.ur)/2.0
+        if r and r > halfSpan:
+            raise ValueError('Radius larger than 1/2 width.')
+        self._radius = r
+##    @property
+##    def roundEnds(self):
+##        return True
         
 class PinGeometry(FPCoreObj):
     "PinGeometry is a sub-primitive of the PinSpec primitive."
@@ -849,13 +915,14 @@ class PinGeometry(FPCoreObj):
     @innerPad.setter
     def innerPad(self, aPad):
         if aPad != None: raise NotImplementedError('Inner pads not yet supported.')
+        self._innerPad = aPad
     def reprvals(self):
         l = [self.compPad]
-        if drill != None or solderPad != None or innerPad != None:
+        if self.drill != None or self.solderPad != None or self.innerPad != None:
             l.append(self.drill)
-        if solderPad != None or innerPad != None:
+        if self.solderPad != None or self.innerPad != None:
             l.append(self._solderPad)
-        if innerPad != None:
+        if self.innerPad != None:
             l.append(self.innerPad)
         return l
     def valid(self, rules):
@@ -867,8 +934,8 @@ class PinInfo(Primitive):
     pass
 
 class PinSpec(PinInfo):
-    def __init__(self, x, y, pinNumber, pinGeometry, rotation = 0, pinName = None):
-        super(PinSpec, self).__init__(x,y)
+    def __init__(self, loc, pinNumber, pinGeometry, rotation = 0, pinName = None):
+        super(PinSpec, self).__init__(loc)
         self.num = int(pinNumber)
         if not isinstance(pinGeometry, PinGeometry):
             raise TypeError('Expected PinGeometry().')
@@ -877,7 +944,7 @@ class PinSpec(PinInfo):
         if pinName != None:
             self._name = str(pinName)
     def reprvals(self):
-        l = [self.x, self.y, self.num, self.geo]
+        l = [self.loc, self.num, self.geo]
         try:
             nm = self._name
         except AttributeError:
@@ -919,8 +986,8 @@ class PinGang(PinInfo):
         self._silk = l
     
 class Silk(Primitive):
-    def __init__(self, x, y, penWidth):
-        super(Silk, self).__init__(x,y)
+    def __init__(self, loc, penWidth):
+        super(Silk, self).__init__(loc)
         self.penWidth = penWidth
     @property
     def penWidth(self):
@@ -931,8 +998,8 @@ class Silk(Primitive):
         self._pw = v
     
 class SilkText(Silk):
-    def __init__(self, x, y, rotation, penWidth, text, size):
-        super(SilkText, self).__init__(x,y, penWidth)
+    def __init__(self, loc, rotation, penWidth, text, size):
+        super(SilkText, self).__init__(loc, penWidth)
         self.rot = rotation
         self.text = str(text) if text != None else ''
         if not (isinstance(size, Dim)):
@@ -942,7 +1009,7 @@ class SilkText(Silk):
         self.size = size # FIXME: Validate is Positive Dim().
     def reprvals(self):
         #return [self.x, self.y, self.rot, self._pw, self.text, self._sz]
-        return [self.x, self.y, self.rot, self.penWidth, self.text, self.size]
+        return [self.loc, self.rot, self.penWidth, self.text, self.size]
 ##    @property
 ##    def size(self):
 ##        return rules[self._sz]
@@ -955,16 +1022,14 @@ class RefDes(SilkText):
     pass
 
 class SilkLine(Silk):
-    def __init__(self, x, y, x2, y2, penWidth):
-        du = Dim.guessDu([x,y,x2,y2],None)
-        super(SilkLine, self).__init__(x,y, penWidth)
-        self.x2 = Dim.OrZero(x2,du)
-        self.y2 = Dim.OrZero(y2,du)
+    def __init__(self, p1, p2, penWidth):
+        super(SilkLine, self).__init__(p1, penWidth)
+        self.p2 = Pt(p2)
 
 class SilkArc(Silk):
     "Fixed radius arc."
-    def __init__(self, x, y, radius, startAngle, arcAngle, penWidth):
-        super(SilkArc, self).__init__(x, y, penWidth)
+    def __init__(self, loc, radius, startAngle, arcAngle, penWidth):
+        super(SilkArc, self).__init__(loc, penWidth)
         if not isinstance(radius, Dim): raise TypeError ('radius must be Dim().')
         self.radius = radius
         if startAngle < 0.0 or startAngle > 360.0:
@@ -980,16 +1045,12 @@ class KeepOut(Primitive):
 
 class KeepOutRect(KeepOut):
     "Keep out rectangle."
-    def __init__(self, x1, y1, x2, y2):
-        if not isinstance(x1, Dim) \
-           and isinstance(y1, Dim) \
-           and isinstance(x2, Dim) \
-           and isinstance(y2, Dim):
-            raise TypeError('Keep-out dimentions must be Dim().')
-        self.x1 = min([x1,x2])
-        self.y1 = min([y1,y2])
-        self.x2 = max([x1,x2])
-        self.y2 = max([y1,y2])
+    def __init__(self, p1, p2):
+        p1, p2 = Pt(p1), Pt(p2)
+        if p1 == None or p2 == None:
+            raise ValueError('Keep out corners can not be None.')
+        self.ll, self.ur = p1.rectify(p2)
+
 
 #
 # Footprint base classes.
@@ -1168,7 +1229,7 @@ class Footprint(FPCoreObj):
         #print 'Final kwdict:', kwdict
         return kwdict
     @classmethod
-    def standardComments(cls, pluginName, kwDict, kwSpecs, rules, ruleList):
+    def standardComments(cls, pluginName, kwDict, rules, ruleList):
         "Append a standard set of comments."
         l = []
         l.append('Generated by landmaker ' + str(dt.date.today()))
@@ -1185,8 +1246,9 @@ class Footprint(FPCoreObj):
         l.append('Plugin: ' + pluginName)
         l.append('Parameters: ')
         for kw in kwDict:
-            units,reqd,isList = kwSpecs[kw]
-            vList = kwDict[kw] if isList else [kwDict[kw]]
+            #units,reqd,isList = kwSpecs[kw]
+            v = kwDict[kw]
+            vList = v if isinstance(v,list) else [v]
             dispList = []
             for val in vList:
                 dispList.append(str(val))

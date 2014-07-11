@@ -60,38 +60,51 @@ class FP_enc(fc.Footprint):
             mntGeo = cls.pinGeometry(mntPad, mntRackDrill)
             # Construct pin specs
             pinSpecs = []
-            pinSpecs.append(cls.pinSpec(fc.Dim.MIL(-275),-fc.Dim.MIL(100),1,ioGeo))
-            pinSpecs.append(cls.pinSpec(fc.Dim.MIL(-275), fc.Dim.MIL(100),2,ioGeo))
-            pinSpecs.append(cls.pinSpec(fc.Dim.MIL(295), fc.Dim.MIL(100),3,ioGeo))
-            pinSpecs.append(cls.pinSpec(fc.Dim.MIL(295), fc.Dim.MIL(0),4,ioGeo))
-            pinSpecs.append(cls.pinSpec(fc.Dim.MIL(295),-fc.Dim.MIL(100),5,ioGeo))
+            pinSpecs.append(cls.pinSpec(fc.Pt.MIL(-275, 100),1,ioGeo))
+            pinSpecs.append(cls.pinSpec(fc.Pt.MIL(-275,-100),2,ioGeo))
+            pinSpecs.append(cls.pinSpec(fc.Pt.MIL( 295,-100),3,ioGeo))
+            pinSpecs.append(cls.pinSpec(fc.Pt.MIL( 295,   0),4,ioGeo))
+            pinSpecs.append(cls.pinSpec(fc.Pt.MIL( 295, 100),5,ioGeo))
             # Mounting pins become pins 6 & 7 for "hardware" connection.
-            pinSpecs.append(cls.pinSpec(fc.Dim.MIL(0),-fc.Dim.MIL(520/2.0),6,mntGeo))                            
-            pinSpecs.append(cls.pinSpec(fc.Dim.MIL(0), fc.Dim.MIL(520/2.0),7,mntGeo))                            
+            pinSpecs.append(cls.pinSpec(fc.Pt.MIL(0,-520/2.0),6,mntGeo))                            
+            pinSpecs.append(cls.pinSpec(fc.Pt.MIL(0, 520/2.0),7,mntGeo))                            
             # Silk
             silk = []
             pw = rules['minsilk']
-            silkx = fc.Dim.MIL(520)/2.0
-            silky = fc.Dim.MIL(490)/2.0
-            silkxgap = fc.Dim.MIL(70)
-            silkygap = fc.Dim.MIL(150)
-            silk.append(cls.silkLine( silkx,-silky, silkxgap,-silky, pw))
-            silk.append(cls.silkLine(-silkx,-silky,-silkxgap,-silky, pw))
-            silk.append(cls.silkLine( silkx, silky, silkxgap, silky, pw))
-            silk.append(cls.silkLine(-silkx, silky,-silkxgap, silky, pw))
-            silk.append(cls.silkLine(-silkx,-silky,-silkx,-silkygap, pw))
-            silk.append(cls.silkLine(-silkx, silky,-silkx, silkygap, pw))
-            silk.append(cls.silkLine( silkx,-silky, silkx,-silkygap, pw))
-            silk.append(cls.silkLine( silkx, silky, silkx, silkygap, pw))
+            silkCorner = fc.Pt.MIL(520/2.0, 490/2.0)
+            silkXLineEP = fc.Pt(fc.Dim.MIL(70), silkCorner.y)
+            silkYLineEP = fc.Pt(silkCorner.x, fc.Dim.MIL(150))
+            silk.append(cls.silkLine( silkCorner,  silkXLineEP, pw))
+            silk.append(cls.silkLine( silkCorner,  silkYLineEP, pw))
+            silk.append(cls.silkLine(-silkCorner, -silkXLineEP, pw))
+            silk.append(cls.silkLine(-silkCorner, -silkYLineEP, pw))
+            silk.append(cls.silkLine( silkCorner.reflox,  silkXLineEP.reflox, pw))
+            silk.append(cls.silkLine( silkCorner.reflox,  silkYLineEP.reflox, pw))
+            silk.append(cls.silkLine( silkCorner.refloy,  silkXLineEP.refloy, pw))
+            silk.append(cls.silkLine( silkCorner.refloy,  silkYLineEP.refloy, pw))
+            
+            
+##            silkx = fc.Dim.MIL(520)/2.0
+##            silky = fc.Dim.MIL(490)/2.0
+##            silkxgap = fc.Dim.MIL(70)
+##            silkygap = fc.Dim.MIL(150)
+##            silk.append(cls.silkLine( silkx,-silky, silkxgap,-silky, pw))
+##            silk.append(cls.silkLine(-silkx,-silky,-silkxgap,-silky, pw))
+##            silk.append(cls.silkLine( silkx, silky, silkxgap, silky, pw))
+##            silk.append(cls.silkLine(-silkx, silky,-silkxgap, silky, pw))
+##            silk.append(cls.silkLine(-silkx,-silky,-silkx,-silkygap, pw))
+##            silk.append(cls.silkLine(-silkx, silky,-silkx, silkygap, pw))
+##            silk.append(cls.silkLine( silkx,-silky, silkx,-silkygap, pw))
+##            silk.append(cls.silkLine( silkx, silky, silkx, silkygap, pw))
             # Keep-outs
             keepOuts = []
         else:
             raise fc.ParamSyntax(str(kw['type']).join(["Unkown type: ","'"]))
         # Make comments
-        cmt = cls.standardComments(cls.pluginName(), kw, kwspecs, rules,
+        cmt = cls.standardComments(cls.pluginName(), kw, rules,
             ['maskrelief','minspace','annulus_hs','refdessize'])
         cmt.append('Pins 6 & 7 are case.')
         # Create the refdes, description, and footprint instance.
-        rd = cls.refDes(0,fc.Dim.MM(2),0, rules['minsilk'], '', rules['refdessize'])
+        rd = cls.refDes(fc.Pt.MM(0,2),0, rules['minsilk'], '', rules['refdessize'])
         desc = 'Alpha ' + kw['type'] + ' encoder.'
         return cls(desc, rd, pinSpecs, silk, cmt, keepOuts) 

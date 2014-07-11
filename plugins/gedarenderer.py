@@ -21,9 +21,27 @@ from collections import namedtuple
 # Import the plug-in core.
 import footprintcore as fc
 
+def box(ll,ur):
+    "Make (ur,ul,ll,lr) tuple from (ll,ur)"
+    return (ur, fc.Pt(ur.x, ll.y), ll, fc.Pt(ll.x, ur.y))
+
 # Define primitive rendering for gEDA.
 
-class Geda_RoundPad(fc.RoundPad):
+class RenderPadBase(object):
+    padFormatStr = 'Pad[{x1:d} {y1:d} {x2:d} {y2:d} {width:d} ' \
+            +'{clear:d} {relief:d} "{name:s}" "{num:d}" "{tflags:s}"]'
+    def smtPad(self, p1, p2, width, clearance, mask_width, name, num, flags):
+        return self.padFormatStr.format( \
+            x1=p1.x.gu, y1=-p1.y.gu, # end 1 \
+            x2=p2.x.gu, y2=-p1.y.gu, # end 2 \
+            width=width.gu,
+            clear=(clearance*2.0).gu,
+            relief=mask_width.gu,
+            name=name,
+            num=num,
+            tflags=flags)
+
+class Geda_RoundPad(RenderPadBase, fc.RoundPad):
     @property
     def square(self):
         return False
@@ -32,17 +50,23 @@ class Geda_RoundPad(fc.RoundPad):
         return self.dia/2.0
     def tFlags(self, side = 'c'):
         assert side in 'cs'
-        return 'onsolder' if side == 's' else ''   
-    def smtPad(self, x, y, num, name='', side='c'):
-        yield 'Pad[{0:d} {1:d} {2:d} {3:d} {4:d} {5:d} {6:d} "{7:s}" "{8:d}" "{9:s}"]'.format(\
-            x.gu, y.gu, # x,y of end 1 \
-            x.gu, y.gu, # x,y of end 2 \
-            self.dia.gu, # width of stripe \
-            (2.0*self.clearance).gu, \
-            (2.0*+self.relief+self.dia).gu, \
-            name, \
-            num, \
-            self.tFlags(side))
+        return 'onsolder' if side == 's' else ''
+    def rendering(self, loc, num, name='', side='c'):
+        yield self.smtPad(loc, loc, self.dia, self.clearance, \
+                          self.maskRelief*2.0+self.dia,
+                          name if name else str(num),
+                          num, 
+                          self.tFlags(side))
+##    def smtPad(self, x, y, num, name='', side='c'):
+##        yield 'Pad[{0:d} {1:d} {2:d} {3:d} {4:d} {5:d} {6:d} "{7:s}" "{8:d}" "{9:s}"]'.format(\
+##            x.gu, y.gu, # x,y of end 1 \
+##            x.gu, y.gu, # x,y of end 2 \
+##            self.dia.gu, # width of stripe \
+##            (2.0*self.clearance).gu, \
+##            (2.0*+self.relief+self.dia).gu, \
+##            name, \
+##            num, \
+##            self.tFlags(side))
 
 class Geda_SquarePad(fc.SquarePad):
     @property
@@ -51,46 +75,66 @@ class Geda_SquarePad(fc.SquarePad):
 ##    @property
 ##    def dia(self):
 ##        return self.width # A pcb-ism. This hack simplifies Pin[] rendering.
-    def smtPad(self, x, y, num, name='',  side='c'):
+    def tFlags(self, side = 'c'):
         assert side in 'cs'
-        return '# <SquarePad as SMT>'
+        return 'square,onsolder' if side == 's' else 'square'
+    def rendering(self, loc, num, name='', side='c'):
+        # FIXME: Round,Square can use same code.
+        yield self.smtPad(loc, loc, self.width, self.clearance, \
+                          self.maskRelief*2.0+self.width,
+                          name if name else str(num),
+                          self.tFlags(side))
+##    def smtPad(self, x, y, num, name='',  side='c'):
+##        assert side in 'cs'
+##        return '# <SquarePad as SMT>'
 
-class RenderRect_Base(object):
+class RenderRect_Base(RenderPadBase):
+    @property
+    def width(self):
+        xd = self.ur.x - self.ll.x
+        yd = self.ur.y - self.ll.y
+        return min([xd, yd])
     @property
     def padRadius(self):
-        xd = self.x2-self.x1
-        yd = self.y2-self.y1
-        radius = min([xd,yd])/2.0
+        radius = self.width/2.0
         assert radius > 0.0
         return radius
-    @property
-    def orientation(self):
-        xd = self.x2-self.x1
-        yd = self.y2-self.y1
-        return 'h' if xd > yd else 'v'
-    def smtPad(self, x, y, num, name='', side='c'):
+##    @property
+##    def orientation(self):
+##        xd = self.ur.x-self.ll.x
+##        yd = self.ur.y-self.ll.y
+##        return 'h' if xd > yd else 'v'
+    def rendering(self, loc, num, name='', side='c'):
         radius = self.padRadius
-        if self.orientation == 'h':
-            # horizontal
-            x1 = (self.x1 + radius) + x
-            x2 = (self.x2 - radius) + x
-            y1 = y
-            y2 = y
-        else:
-            # vertical
-            x1 = x
-            x2 = x
-            y1 = (self.y1+radius) + y
-            y2 = (self.y2-radius) + y
-        yield 'Pad[{0:d} {1:d} {2:d} {3:d} {4:d} {5:d} {6:d} "{7:s}" "{8:d}" "{9:s}"]'.format(\
-            x1.gu, y1.gu, # x,y of end 1 \
-            x2.gu, y2.gu, # x,y of end 2 \
-            (2.0*radius).gu, # width of stripe \
-            (2.0*self.clearance).gu, \
-            (2.0*(self.relief+radius)).gu, \
-            name, \
-            num, \
-            self.tFlags(side))
+        radOffset = fc.Pt(radius,radius)
+        p1 = (self.ll + radOffset) + loc
+        p2 = (self.ur - radOffset) + loc
+        yield self.smtPad(p1, p2, self.width, self.clearance, \
+                          self.maskRelief*2.0 + self.width,
+                          name if name else str(num),
+                          num, 
+                          self.tFlags(side))            
+##        if self.orientation == 'h':
+##            # horizontal
+##            x1 = (self.x1 + radius) + x
+##            x2 = (self.x2 - radius) + x
+##            y1 = y
+##            y2 = y
+##        else:
+##            # vertical
+##            x1 = x
+##            x2 = x
+##            y1 = (self.y1+radius) + y
+##            y2 = (self.y2-radius) + y
+##        yield 'Pad[{0:d} {1:d} {2:d} {3:d} {4:d} {5:d} {6:d} "{7:s}" "{8:d}" "{9:s}"]'.format(\
+##            x1.gu, y1.gu, # x,y of end 1 \
+##            x2.gu, y2.gu, # x,y of end 2 \
+##            (2.0*radius).gu, # width of stripe \
+##            (2.0*self.clearance).gu, \
+##            (2.0*(self.relief+radius)).gu, \
+##            name, \
+##            num, \
+##            self.tFlags(side))
         
 class Geda_RectPad(RenderRect_Base,fc.RectPad):
     def tFlags(self, side='c'):
@@ -132,15 +176,16 @@ class Geda_PinSpec(fc.PinSpec):
         if cl.drilled and cl.simple and cl.symmetric:
             # These map directly to Pin[] elements.
             p = self.geo.compPad
-            yield 'Pin[{0:d} {1:d} {2:d} {3:d} {4:d} {5:d} "{6:s}" "{7:d}" "{8:s}"]'.format( \
-                self.x.gu, self.y.gu,  # x,y relative to mark \
-                p.dia.gu,  # pad diameter \
-                (p.clearance * 2.0).gu,  # Cu clearance \
-                (p.dia + 2.0*p.relief).gu,  # Diameter of mask anti-pad \
-                self.geo.drill.gu,  # Drill diameter \
-                self.name,  # pin name \
-                self.num,  # pin number \
-                'square' if p.square else '')
+            # FIXME: make RenderingPin classs to handle Pin[] cases.
+            yield 'Pin[{x:d} {y:d} {dia:d} {clear:d} {mask:d} {drill:d} "{pname:s}" "{pnum:d}" "{tflags:s}"]'.format( \
+                x=self.loc.x.gu, y=-self.loc.y.gu,  # x,y relative to mark \
+                dia=p.dia.gu,  # pad diameter \
+                clear=(p.clearance * 2.0).gu,  # Cu clearance \
+                mask=(p.dia + 2.0*p.maskRelief).gu,  # Diameter of mask anti-pad \
+                drill=self.geo.drill.gu,  # Drill diameter \
+                pname=self.name,  # pin name \
+                pnum=self.num,  # pin number \
+                tflags='square' if p.square else '')
         elif cl.topOnly and not cl.drilled:
             # These map directly to Pad[] elements.
             yield '# <render a normal SMT pad>'
@@ -152,7 +197,7 @@ class Geda_PinSpec(fc.PinSpec):
             # bottom extents.
             radius = min([self.geo.solderPad.padRadius, self.geo.compPad.padRadius])
             yield 'Pin[{0:d} {1:d} {2:d} {3:d} {4:d} {5:d} "{6:s}" "{7:d}" "{8:s}"]'.format( \
-                self.x.gu, self.y.gu,  # x,y relative to mark \
+                self.loc.x.gu, -self.loc.y.gu,  # x,y relative to mark \
                 (2.0*radius).gu, # pad diameter \
                 0, # Cu clearance comes from Pad[] \
                 0, # mask relief comes from Pad[] \
@@ -161,9 +206,9 @@ class Geda_PinSpec(fc.PinSpec):
                 self.num,  # pin number \
                 '')  # no flags
             # Now put down the pads on each side of the board.
-            for ln in self.geo.compPad.smtPad(self.x, self.y, self.num, self.name):
+            for ln in self.geo.compPad.rendering(self.loc, self.num, self.name):
                 yield ln
-            for ln in self.geo.solderPad.smtPad(self.x, self.y, self.num, self.name,'s'):
+            for ln in self.geo.solderPad.rendering(self.loc, self.num, self.name,'s'):
                 yield ln
                 
 
@@ -187,7 +232,7 @@ class Geda_SilkLine(fc.SilkLine):
     def rendering(self, warningCallback):
         # landmaker SilkLine maps directly to ElementLine[] element.
         s = 'ElementLine['
-        params = [self.x, self.y, self.x2, self.y2, self.penWidth]
+        params = [self.loc.x, -self.loc.y, self.p2.x, -self.p2.y, self.penWidth]
         s += ' '.join([str(param.gu) for param in params])
         s += ']'
         yield s
@@ -211,20 +256,34 @@ class Geda_KeepOutRect(fc.KeepOutRect):
         # Construct some silk lines and render the keep-out area that way.'
         pen = fc.Dim.MIL(10) # FIXME: remove hard=coded silk width, use rule.
         # Silk line has some width, so offset the lines into the keep-out area.
-        offset = pen/2.0
-        ox1 = self.x1 + offset
-        oy1 = self.y1 + offset
-        ox2 = self.x2 - offset
-        oy2 = self.y2 - offset
+        half_pen = pen/2.0
+        offset = fc.Pt(half_pen, half_pen)
         s = []
-        # Make a box
-        s.append(Geda_SilkLine(ox1, oy1, ox1, oy2, pen))
-        s.append(Geda_SilkLine(ox1, oy2, ox2, oy2, pen))
-        s.append(Geda_SilkLine(ox2, oy2, ox2, oy1, pen))
-        s.append(Geda_SilkLine(ox2, oy1, ox1, oy1, pen))
-        # Put an X in the box
-        s.append(Geda_SilkLine(ox1, oy1, ox2, oy2, pen))
-        s.append(Geda_SilkLine(ox1, oy2, ox2, oy1, pen))        
+        # Make a box.
+        ur,ul,ll,lr = box(self.ll,self.ur)
+        s.append(Geda_SilkLine(ll,lr,pen))
+        s.append(Geda_SilkLine(lr,ur,pen))
+        s.append(Geda_SilkLine(ur,ul,pen))
+        s.append(Geda_SilkLine(ul,ll,pen))
+        # Put an X in the box.
+        s.append(Geda_SilkLine(ll,ur,pen))
+        s.append(Geda_SilkLine(ul,lr,pen))
+        
+##        # Silk line has some width, so offset the lines into the keep-out area.
+##        offset = pen/2.0
+##        ox1 = self.x1 + offset
+##        oy1 = self.y1 + offset
+##        ox2 = self.x2 - offset
+##        oy2 = self.y2 - offset
+##        s = []
+##        # Make a box
+##        s.append(Geda_SilkLine(ox1, oy1, ox1, oy2, pen))
+##        s.append(Geda_SilkLine(ox1, oy2, ox2, oy2, pen))
+##        s.append(Geda_SilkLine(ox2, oy2, ox2, oy1, pen))
+##        s.append(Geda_SilkLine(ox2, oy1, ox1, oy1, pen))
+##        # Put an X in the box
+##        s.append(Geda_SilkLine(ox1, oy1, ox2, oy2, pen))
+##        s.append(Geda_SilkLine(ox1, oy2, ox2, oy1, pen))        
         # render the silk
         for silk in s:
             for ln in silk.rendering(warningCallback):
@@ -257,9 +316,10 @@ class Geda_Footprint(object):
         textScale = int((self.refdes.size / fc.Dim.MIL(40)) * 100.0)
         textFlags = ''
         textRot = int((self.refdes.rot %360.0) / 90.0)
-        yield 'Element["{0:s}" "" "" "" {1:d} {2:d} {3:d} {4:d} {5:d} {6:d} "{7:s}"]'.format( \
-            sflags, markY, markY, self.refdes.x.gu, self.refdes.y.gu, \
-            textRot, textScale, textFlags)
+        yield 'Element["{sflags:s}" "" "" "" {markx:d} {marky:d} {refdesx:d} {refdesy:d} {trot:d} {tscale:d} "{tflags:s}"]'.format( \
+            sflags=sflags, markx=markX, marky=markY,
+            refdesx=self.refdes.loc.x.gu, refdesy=self.refdes.loc.y.gu, \
+            trot=textRot, tscale=textScale, tflags=textFlags)
         yield '('
         # Render comments.
         if self.desc != '':
@@ -289,25 +349,11 @@ fc.importPlugins(foundPlugins, globals(), locals())
 
 # Any rendering classes that must be manually defined should
 # be declared here before calling deriveRenderingClasses().
+
 fc.deriveRenderingClasses(foundPlugins, 'Geda', Geda_Footprint, globals())
-    
-### Import the generic plug-ins.
-##from fp_so import FP_so
-##from fp_th2pad import FP_th2pad
-
-
-##class Geda_FP_so(Geda_Footprint, plmod['FP_so'].FP_so):
-##    pass
-##
-##class Geda_FP_th2pad(Geda_Footprint, plmod['FP_th2pad'].FP_th2pad):
-##    pass
-
 fp_plugins = fc.collectPlugins(globals())
 
 if __name__ == '__main__':
-    print fp_plugins
-    gg = Geda_FP_so()
-    ff = gg.silkText(1,2,3,4,"5",10)
-    ff.foo()
+    pass
 
 

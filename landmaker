@@ -19,6 +19,7 @@
 #   
 
 import os
+import sys
 import argparse
 import commands.commandcore as cmd
 import plugins.footprintcore as fpc
@@ -132,8 +133,16 @@ processRc(warningsToConsole)
 if args.fp:
     # Execute fp command from command line arguments.
     footprint = cmd.verbs['fp'].dispatchPlugin(args.fp[0], warningsToConsole)
-    for ln in footprint.rendering(warningsToConsole):
-        print ln
+    if footprint:
+        try:
+            for ln in footprint.rendering(warningsToConsole):
+                print ln
+            sys.exit(0)
+        except Exception as e: # FIXME: handle specific exceptions, print exception msgs.
+            print 'Exception args:',repr(e.args)
+            sys.exit('Footprint rendering failed.')
+    sys.exit('No footprint generated.')
+    
 elif args.script == None:
     # No script, so drop into interactive mode.
     interactive()

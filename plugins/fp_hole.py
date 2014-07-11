@@ -67,6 +67,9 @@ class FP_hole(fc.Footprint):
             'fit':      fc.KWSpec(None, False, False),
         }
         kw = cls.parseKwargs(params, kwspecs)
+        return cls.fromKwargs(rules, rack, warningCallback, **kw)
+    @classmethod
+    def fromKwargs(cls, rules, rack, warningCallback, **kw):
         # Pick up general rules
         maskrelief = rules['maskrelief']
         clearance = rules['minspace']
@@ -100,15 +103,16 @@ class FP_hole(fc.Footprint):
         # construct pin geometry
         geo = cls.pinGeometry(pad, rackDrill)
         # construct pin specs
-        pinSpecs = [cls.pinSpec(fc.Dim.MIL(0),fc.Dim.MIL(0),1,geo)]
+        #pinSpecs = [cls.pinSpec(fc.Dim.MIL(0),fc.Dim.MIL(0),1,geo)]
+        pinSpecs = [cls.pinSpec(fc.Pt.MIL(0,0),1,geo)]
         # No silk
         silk = []
         # No keep-outs
         keepOuts = []
         # Make comments
-        cmt = cls.standardComments(cls.pluginName(), kw, kwspecs, rules,
+        cmt = cls.standardComments(cls.pluginName(), kw, rules,
             ['maskrelief','minspace','refdessize'])
         # Create the refdes, description, and footprint instance.
-        rd = cls.refDes(0,fc.Dim.MM(2),0, rules['minsilk'], '', rules['refdessize'])
+        rd = cls.refDes(fc.Pt.MM(0,2),0, rules['minsilk'], '', rules['refdessize'])
         desc = 'Screw hole.'
         return cls(desc, rd, pinSpecs, silk, cmt, keepOuts) 

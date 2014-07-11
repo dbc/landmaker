@@ -51,7 +51,7 @@ class FP_th2pad(fc.Footprint):
             'spacing':  fc.KWSpec('mil', True, False),
             'drill':    fc.KWSpec('inch', True, False),
             'dia' :     fc.KWSpec('mil', False, False),
-            'annululs': fc.KWSpec('mil', False, False),
+            'annulus': fc.KWSpec('mil', False, False),
             'artwidth': fc.KWSpec('mil', False, False),
             'artlen' :  fc.KWSpec('mil', False, False),
         }
@@ -72,8 +72,9 @@ class FP_th2pad(fc.Footprint):
         pg.valid(rules)
         # Make pins
         halfwidth = kw['spacing'] / 2.0
-        pin1 = cls.pinSpec(-halfwidth, 0, 1, pg)
-        pin2 = cls.pinSpec( halfwidth, 0, 2, pg)
+        zero = halfwidth.u0
+        pin1 = cls.pinSpec(fc.Pt(-halfwidth, zero), 1, pg)
+        pin2 = cls.pinSpec(fc.Pt( halfwidth, zero), 2, pg)
         # Make silk
         box = []
         silkw = rules['minsilk']
@@ -84,17 +85,18 @@ class FP_th2pad(fc.Footprint):
             except KeyError:
                 alhalf = halfwidth - (diameter + maskrelief + 1.5*silkw)
             # Draw a box.
-            box.append(cls.silkLine( alhalf,  awhalf, -alhalf,  awhalf, silkw))
-            box.append(cls.silkLine( alhalf, -awhalf, -alhalf, -awhalf, silkw))
-            box.append(cls.silkLine( alhalf,  awhalf,  alhalf, -awhalf, silkw))
-            box.append(cls.silkLine(-alhalf,  awhalf, -alhalf, -awhalf, silkw))
+            box.append(cls.silkLine(fc.Pt( alhalf,  awhalf), fc.Pt(-alhalf,  awhalf), silkw))
+            box.append(cls.silkLine(fc.Pt( alhalf, -awhalf), fc.Pt(-alhalf, -awhalf), silkw))
+            box.append(cls.silkLine(fc.Pt( alhalf,  awhalf), fc.Pt( alhalf, -awhalf), silkw))
+            box.append(cls.silkLine(fc.Pt(-alhalf,  awhalf), fc.Pt(-alhalf, -awhalf), silkw))
         except KeyError:
             # No silk at all.
-            awhalf = 0.0 # For placing refdes
+            awhalf = fc.Dim.MIL(0) # For placing refdes
         # Make refdes
-        rd = cls.refDes(0,fc.Dim.MIL(20) + awhalf,0, rules['minsilk'], '', rules['refdessize'])
+        silky = awhalf+20
+        rd = cls.refDes(fc.Pt(silky.u0,silky),0, rules['minsilk'], '', rules['refdessize'])
         # Make comments
-        cmt = cls.standardComments('th2pad', kw, kwspecs, rules, 
+        cmt = cls.standardComments('th2pad', kw, rules, 
             ['maskrelief','minspace','minsilk','refdessize'])
         # Create the footprint instance.
         desc = str(kw['desc'])
