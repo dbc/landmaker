@@ -21,6 +21,7 @@
 import os
 import sys
 import argparse
+import readline
 import commands.commandcore as cmd
 import plugins.footprintcore as fpc
 
@@ -48,6 +49,19 @@ Optional rc file is first found of: ./landmaker.rc, ~/.landmaker/landmaker.rc"""
     return args
 
 def interactive():
+    "Enter interactive shell mode."
+    commands = cmd.verbs.keys()
+    def completer(text, state):
+        options = [i for i in commands if i.startswith(text)]
+        if state < len(options):
+            return options[state]
+        else:
+            return None
+
+    readline.parse_and_bind("tab: complete")
+    readline.set_completer(completer)
+
+
     while True:
         try:
             ln = raw_input('> ')
@@ -88,9 +102,6 @@ def processRc(warningCallback):
         print rcfilepath.join(['rc file:',' not found.'])
     if rcfilepath != None:
         batch(rcfilepath, warningCallback)           
-
-##class MajorHack(object):
-##    pass
 
 def init(warningCallback):
     # Propagate debug flags.
