@@ -300,7 +300,7 @@ class Pt(FPCoreObj):
     def reprvals(self):
         return [self._x, self._y]
     def __str__(self):
-        return 'Pt:'+str(self.x)+','+str(self.y)
+        return ''.join(['Pt(',str(self.x),',',str(self.y),')'])
     def __getitem__(self, index):
         # This enables __init__() to be a copy constructor.
         if index==0: return self.x
