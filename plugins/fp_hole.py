@@ -58,7 +58,7 @@ class FP_hole(fc.Footprint):
         yield '    fit="free" ; the default'
         yield '    fit="close" '
     @classmethod
-    def parse(cls, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warningCallback):
         # Call the standard parameter parser.
         kwspecs = {
             'pad':      fc.KWSpec('mm', True, False),
@@ -67,9 +67,9 @@ class FP_hole(fc.Footprint):
             'fit':      fc.KWSpec(None, False, False),
         }
         kw = cls.parseKwargs(params, kwspecs)
-        return cls.fromKwargs(rules, rack, warningCallback, **kw)
+        return cls.fromKwargs(footprintname, rules, rack, warningCallback, **kw)
     @classmethod
-    def fromKwargs(cls, rules, rack, warningCallback, **kw):
+    def fromKwargs(cls, footprintname, rules, rack, warningCallback, **kw):
         # Pick up general rules
         maskrelief = rules['maskrelief']
         clearance = rules['minspace']
@@ -115,4 +115,4 @@ class FP_hole(fc.Footprint):
         # Create the refdes, description, and footprint instance.
         rd = cls.refDes(fc.Pt.MM(0,2),0, rules['minsilk'], '', rules['refdessize'])
         desc = 'Screw hole.'
-        return cls(desc, rd, pinSpecs, silk, cmt, keepOuts) 
+        return cls(footprintname, desc, rd, pinSpecs, silk, cmt, keepOuts) 

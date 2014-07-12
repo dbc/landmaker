@@ -1116,9 +1116,10 @@ class Footprint(FPCoreObj):
     silkLine = SilkLine
     silkArc = SilkArc
     keepOutRect = KeepOutRect
-    def __init__(self, description, refdes, pins = [], silk = [], \
+    def __init__(self, name, description, refdes, pins = [], silk = [], \
                  comments = [], keepOuts = []):
-        self.desc = str(description) if description != None else ''
+        self.name = str(name) if name is not None else ''
+        self.desc = str(description) if description is not None else ''
         assert refdes != None
         if isinstance(refdes, str):
             refdes = self.refDes(0,0,0,'textpen',refdes,'refdessize')
@@ -1147,7 +1148,7 @@ class Footprint(FPCoreObj):
     def reprvals(self):
         return [self.refdes, self.pins, self.silk, self.comments]
     @classmethod
-    def parse(cls, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warningCallback):
         raise NotImplementedError('Abstract')
     @classmethod
     def parseKwargs(cls, params, kwspec = {}):
