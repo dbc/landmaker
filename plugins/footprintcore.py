@@ -1092,6 +1092,10 @@ KWSpec = namedtuple('KWSpec','units req vlist')
 
 class KWParamLexer(tt.RegexTokenizer):
     spec = [
+        # FIXME: Validate order of token matches.
+        # FIXME: missing trailing quote causes problems.
+        # FIXME: probably should have an unmatched cruft rule.
+        # FIXME: number tokenizer should accept units also.
         (r'[^.0-9=,"# ][^=," ]*', KWToken.typeKW), # Keyword, identifier, etc.
         (r'[0-9.]+', KWToken.typeNum), # Number. (Expression is over-eager.)
         (r'#([0-9]+|[A-Z])', KWToken.typeDrillNum), # A number/letter drill.
@@ -1155,7 +1159,6 @@ class Footprint(FPCoreObj):
         "Standarized parser for plug-in parameters."
         par = LinesOf(params)
         plist = []
-        # FIXME: KWParamLexer should be compiled only once for efficiency.
         tokens = tt.TokenizeAhead(KWParamLexer(par))
         while True:
             # Get keyword token.

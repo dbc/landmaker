@@ -20,7 +20,6 @@
 # Alpha through hole: Rotary encoder RE130F
 
 import footprintcore as fc
-import datetime as dt
 
 class FP_enc(fc.Footprint):
     @classmethod

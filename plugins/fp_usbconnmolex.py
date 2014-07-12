@@ -23,7 +23,6 @@
 # check min annulus rule carefully
 
 import footprintcore as fc
-import datetime as dt
 
 class FP_usbconnmolex(fc.Footprint):
     @classmethod

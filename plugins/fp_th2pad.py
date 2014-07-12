@@ -17,7 +17,6 @@
 #   
 
 import footprintcore as fc
-import datetime as dt
 
 class FP_th2pad(fc.Footprint):
     @classmethod
