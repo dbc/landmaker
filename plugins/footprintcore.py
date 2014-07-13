@@ -173,6 +173,8 @@ class Dim(FPCoreObj):
             v = float(mo.group(1))
             du = mo.group(3) if mo.group(3) else defaultUnits
             return cls.VU(v,du)
+        elif s.startswith('#'):
+            return cls.DRILL(s)
         else:
             raise ValueError(s + ' not convertable to Dim().')
     @classmethod
@@ -729,7 +731,6 @@ class SquarePad(Pad):
     @width.setter
     def width(self, v):
         w = Dim(v)
-        print 'Quarepad w:',w
         if w < 0.0:
             raise ValueError('Width must be > 0.')
         self._width = w
@@ -1056,7 +1057,7 @@ class KeepOutRect(KeepOut):
 # Footprint base classes.
 #
 class KWToken(FPCoreObj):
-    keywords = {'mm':'MM','inch':'INCH', 'in':'INCH','mil':'MIL'}
+    #keywords = {'mm':'MM','inch':'INCH', 'in':'INCH','mil':'MIL'}
     units = frozenset(['MIL', 'MM', 'INCH'])
     def __init__(self, ttype, value):
         self.type = ttype
@@ -1065,39 +1066,67 @@ class KWToken(FPCoreObj):
         return [self.type, self.value]
     @classmethod
     def typeKW(cls, s, lexposIgnored):
-        if s in cls.keywords:
-            return cls(cls.keywords[s],s)
+##        if s in cls.keywords:
+##            return cls(cls.keywords[s],s)
         return cls('KW',s)
     @classmethod
     def typePunct(cls, s, lexposIgnored):
         return cls(s,s)
     @classmethod
     def typeNum(cls, s, lexposIgnored):
+##        try:
+##            v = float(s)
+##            return cls('NUM',v)
+##        except ValueError:
+##            return cls('BAD',s)
+        try:
+            d = Dim(s)
+        except ValueError:
+            #return cls('BAD',s)
+            pass
+        else:
+            return cls('NUM',d)
         try:
             v = float(s)
-            return cls('NUM',v)
         except ValueError:
             return cls('BAD',s)
-    @classmethod
-    def typeDrillNum(cls, s, lexposIgnored):
-        d = DrillRack.numberToDim(s)
-        if d == None:
-            return cls('BAD',s)
-        return cls('DIM',d)
+        else:
+            return cls('NUM',v)
+##    @classmethod
+##    def typeDrillNum(cls, s, lexposIgnored):
+##        d = DrillRack.numberToDim(s)
+##        if d == None:
+##            return cls('BAD',s)
+##        return cls('DIM',d)
     @classmethod
     def typeStr(cls, s, lexposIgnored):
-        return cls('STR',s[1:-1])
+        end = -1 if s[-1] in '"\'' else None
+        return cls('STR',s[1:end])
+    @classmethod
+    def typeBad(cls, s, lexposIgnored):
+        return cls('BAD',s)
+    def __eq__(self, other):
+        if other is None:
+            return False
+        return self.type == other.type and self.value == other.value
 
 KWSpec = namedtuple('KWSpec','units req vlist')
 
 class KWParamLexer(tt.RegexTokenizer):
     spec = [
-        (r'[^.0-9=,"# ][^=," ]*', KWToken.typeKW), # Keyword, identifier, etc.
-        (r'[0-9.]+', KWToken.typeNum), # Number. (Expression is over-eager.)
-        (r'#([0-9]+|[A-Z])', KWToken.typeDrillNum), # A number/letter drill.
-        (r'[=,]', KWToken.typePunct), # Punctuation.
-        (r'".*"', KWToken.typeStr), # Quoted matter.
+        # The order is critical!  First match encountered is always taken.
+        # Floats need to come before integers or confusion reigns.
+        (r'[a-zA-Z][a-zA-Z0-9_]*', KWToken.typeKW), # Keyword/identifier, etc.
+        (r'[0-9]*[\.][0-9]+\s*(mm|mil|inch|in)?', KWToken.typeNum), # Float.
+        (r'[0-9]+\s*(mm|mil|inch|in)?', KWToken.typeNum), # Integer.
+        (r'#([0-9]+|[A-Z])', KWToken.typeNum), # A number/letter drill.
+        (r'".*"', KWToken.typeStr), # Quoted matter using "
+        (r"'.*'", KWToken.typeStr), # Quoted matter using '
+        (r'".*$', KWToken.typeStr), # Missing close " -- take it all :/
+        (r"'.*$", KWToken.typeStr), # Missing close ' -- take it all
         (r'\s*',None), # Ignore white space.
+        (r'[=,]', KWToken.typePunct), # Valid punctuation
+        (r'.',KWToken.typeBad), # Catch-all
     ]
 
 class Footprint(FPCoreObj):
@@ -1116,9 +1145,10 @@ class Footprint(FPCoreObj):
     silkLine = SilkLine
     silkArc = SilkArc
     keepOutRect = KeepOutRect
-    def __init__(self, description, refdes, pins = [], silk = [], \
+    def __init__(self, name, description, refdes, pins = [], silk = [], \
                  comments = [], keepOuts = []):
-        self.desc = str(description) if description != None else ''
+        self.name = str(name) if name is not None else ''
+        self.desc = str(description) if description is not None else ''
         assert refdes != None
         if isinstance(refdes, str):
             refdes = self.refDes(0,0,0,'textpen',refdes,'refdessize')
@@ -1147,14 +1177,13 @@ class Footprint(FPCoreObj):
     def reprvals(self):
         return [self.refdes, self.pins, self.silk, self.comments]
     @classmethod
-    def parse(cls, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warningCallback):
         raise NotImplementedError('Abstract')
     @classmethod
     def parseKwargs(cls, params, kwspec = {}):
         "Standarized parser for plug-in parameters."
         par = LinesOf(params)
         plist = []
-        # FIXME: KWParamLexer should be compiled only once for efficiency.
         tokens = tt.TokenizeAhead(KWParamLexer(par))
         while True:
             # Get keyword token.
@@ -1163,46 +1192,26 @@ class Footprint(FPCoreObj):
                 if tkn.type == 'KW':
                     kw = tkn.value
                 else:
-                    print 'tkn:',tkn
-                    raise ParamSyntax('Expected keyword.')
+                    raise ParamSyntax(
+                        ''.join(['Expected keyword, got: ', str(tkn.value)]))
             except StopIteration:
                 break
             # Check for '=' and value list.
             vlist = []
-            if tokens[0] != None and tokens[0].type == '=':
+            if tokens[0] and tokens[0].type == '=':
                 # Pick up value list.
                 next(tokens) # Consume the '='.
                 while True:
                     vtkn = tokens[0]
-                    if vtkn.type == 'STR' or vtkn.type == 'KW':
-                        # Treat KW here as an unquoted string.
+                    if vtkn and vtkn.type in ['NUM','STR','KW']:
+                        # Treat KW here as an unquotes string.
                         val = vtkn.value
-                        next(tokens) # Consume string value.
-                    elif vtkn.type == 'NUM':
-                        val = vtkn.value
-                        next(tokens) # Consume numeric value.
-                        vtkn = tokens[0]
-                        if vtkn and vtkn.type in KWToken.units:
-                            vtkn = next(tokens)
-                            units = vtkn.value
-                        else:
-                            try:
-                                units = kwspec[kw].units
-                            except KeyError:
-                                units = 'mm' # It's an error, but will catch later.
-                        if units == 'mil':
-                            val = Dim.MIL(val)
-                        elif units == 'mm':
-                            val = Dim.MM(val)
-                        elif units in ['inch','in']:
-                            val = Dim.INCH(val)
-                        else:
-                            raise InternalError('parseKwargs: Can not convert parameter to type: ' + str(units))
+                        next(tokens) # Consume the value.
                     else:
                         break
                     vlist.append(val)
                     if tokens[0] and tokens[0].type == ',':
-                        next(tokens)
+                        next(tokens) # consume the comma
                     else:
                         break
             plist.append((kw,vlist))
@@ -1221,13 +1230,35 @@ class Footprint(FPCoreObj):
                 kwspec[kw]
             except KeyError:
                 raise InvalidKWError(kw)
+        # Normalize floats to expected units.
+        for kw in kwdict:
+            kwdict[kw] = cls._normTokenVals(kwdict[kw],kwspec[kw].units)
         # Eliminate redundant value lists.
         for kw in kwdict:
             if not kwspec[kw].vlist:
                 v = kwdict[kw]
-                kwdict[kw] = v[0] if len(v) > 0 else None
+                kwdict[kw] = v[0] if len(v) else None
         #print 'Final kwdict:', kwdict
         return kwdict
+    @classmethod
+    def _normTokenVals(cls, value_list, default_units):
+        # If anything has units, and they all match, use that
+        # instead of default.
+        consensus_units = None
+        for tkn in value_list:
+            try:
+                u = tkn.value.du
+            except AttributeError:
+                pass # Not a Dim().
+            else:
+                if consensus_units and consensus_units != u:
+                    consensus_units = None
+                    break # no consensus
+                else:
+                    consensus_units = u
+        u = consensus_units if consensus_units else default_units
+        return [v if not isinstance(v,float) else Dim.VU(v,u) for v in value_list]
+            
     @classmethod
     def standardComments(cls, pluginName, kwDict, rules, ruleList):
         "Append a standard set of comments."

@@ -20,5 +20,5 @@ import footprintcore as fc
 
 class FP_so(fc.Footprint):
     @classmethod
-    def parse(cls, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warningCallback):
         return cls()

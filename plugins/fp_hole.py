@@ -16,30 +16,32 @@
 #   along with landmaker.  If not, see <http://www.gnu.org/licenses/>.
 #   
 
-# Footprints for:
-# Alpha through hole: Rotary encoder RE130F
 
 import footprintcore as fc
-import datetime as dt
 from collections import namedtuple
 
 DrillFit=namedtuple('DrillFit','closeFit freeFit')
 
 metric = {
     "M1.0":DrillFit(fc.Dim.MM(1.05),fc.Dim.MM(1.2)),
+    "M1"  :DrillFit(fc.Dim.MM(1.05),fc.Dim.MM(1.2)),
     "M1.1":DrillFit(fc.Dim.MM(1.15),fc.Dim.MM(1.3)),
     "M1.2":DrillFit(fc.Dim.MM(1.3),fc.Dim.MM(1.5)),
     "M1.4":DrillFit(fc.Dim.MM(1.5),fc.Dim.MM(1.7)),
     "M1.6":DrillFit(fc.Dim.MM(1.7),fc.Dim.MM(2.0)),
     "M1.8":DrillFit(fc.Dim.MM(1.9),fc.Dim.MM(2.2)),
     "M2.0":DrillFit(fc.Dim.MM(2.2),fc.Dim.MM(2.6)),
+    "M2"  :DrillFit(fc.Dim.MM(2.2),fc.Dim.MM(2.6)),
     "M2.2":DrillFit(fc.Dim.MM(2.4),fc.Dim.MM(2.8)),
     "M2.5":DrillFit(fc.Dim.MM(2.7),fc.Dim.MM(3.1)),
     "M3.0":DrillFit(fc.Dim.MM(3.2),fc.Dim.MM(3.6)),
+    "M3"  :DrillFit(fc.Dim.MM(3.2),fc.Dim.MM(3.6)),
     "M3.5":DrillFit(fc.Dim.MM(3.7),fc.Dim.MM(4.2)),
     "M4.0":DrillFit(fc.Dim.MM(4.3),fc.Dim.MM(4.8)),
+    "M4"  :DrillFit(fc.Dim.MM(4.3),fc.Dim.MM(4.8)),
     "M4.5":DrillFit(fc.Dim.MM(4.8),fc.Dim.MM(5.3)),
     "M5.0":DrillFit(fc.Dim.MM(5.3),fc.Dim.MM(5.8)),
+    "M5"  :DrillFit(fc.Dim.MM(5.3),fc.Dim.MM(5.8)),
 }
 
 number = {}
@@ -58,7 +60,7 @@ class FP_hole(fc.Footprint):
         yield '    fit="free" ; the default'
         yield '    fit="close" '
     @classmethod
-    def parse(cls, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warningCallback):
         # Call the standard parameter parser.
         kwspecs = {
             'pad':      fc.KWSpec('mm', True, False),
@@ -67,9 +69,9 @@ class FP_hole(fc.Footprint):
             'fit':      fc.KWSpec(None, False, False),
         }
         kw = cls.parseKwargs(params, kwspecs)
-        return cls.fromKwargs(rules, rack, warningCallback, **kw)
+        return cls.fromKwargs(footprintname, rules, rack, warningCallback, **kw)
     @classmethod
-    def fromKwargs(cls, rules, rack, warningCallback, **kw):
+    def fromKwargs(cls, footprintname, rules, rack, warningCallback, **kw):
         # Pick up general rules
         maskrelief = rules['maskrelief']
         clearance = rules['minspace']
@@ -115,4 +117,4 @@ class FP_hole(fc.Footprint):
         # Create the refdes, description, and footprint instance.
         rd = cls.refDes(fc.Pt.MM(0,2),0, rules['minsilk'], '', rules['refdessize'])
         desc = 'Screw hole.'
-        return cls(desc, rd, pinSpecs, silk, cmt, keepOuts) 
+        return cls(footprintname, desc, rd, pinSpecs, silk, cmt, keepOuts) 

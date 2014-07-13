@@ -21,7 +21,7 @@ import re
 
 debug = ''
 
-class CommandSyntax(Exception):
+class CommandSyntaxError(Exception):
     # Error messgage will be in args[0].
     pass
 
@@ -73,12 +73,12 @@ class Cmd_include(Command):
         "s : <filename>"
         s = s.strip()
         if s == '':
-            raise CommandSyntax('No include file specified.')
+            raise CommandSyntaxError('No include file specified.')
         filename = s.split(' ')[0]
         if not os.path.isfile(filename):
-            raise CommandSyntax(filename + ' is not a file.')
+            raise CommandSyntaxError(filename + ' is not a file.')
         if filename in self.breadcrumbs:
-            raise CommandSyntax('Recursive include encountered.')
+            raise CommandSyntaxError('Recursive include encountered.')
         self.breadcrumbs.add(filename)
         if 'i' in debug:
             print 'from:',filename
@@ -88,7 +88,7 @@ class Cmd_include(Command):
                     print 'including:',ln
                 try:
                     dispatchCommand(ln, warningCallback)
-                except CommandSyntax as e:
+                except CommandSyntaxError as e:
                     print 'Error in batch file {0:s}:'.format(filename)
                     print e.args[0]
                     break
@@ -127,7 +127,7 @@ class Cmd_drillrack(Command):
                     try:
                         ork = self.drillRacks[oldRack]
                     except KeyError:
-                        raise CommandSyntax (oldRack + " doesn't exist.")
+                        raise CommandSyntaxError (oldRack + " doesn't exist.")
                     rk = self.rackClass(ork.drills(), ork.symbolics())
                 else:
                     rk = self.rackClass()
@@ -149,7 +149,7 @@ class Cmd_drill(Command):
         "s : <size>"
         t = s.split(' ')
         if t[0] == '':
-            raise CommandSyntax('Must specify drill size.')
+            raise CommandSyntaxError('Must specify drill size.')
         while len(t) < 3:
             t.append('')
         if t[0][0] in '0123456789#.':
@@ -158,7 +158,7 @@ class Cmd_drill(Command):
         else:
             name = t[0]
             if t[1] == '':
-                raise CommandSyntax('Must specify drill size.')
+                raise CommandSyntaxError('Must specify drill size.')
             size = self._size(t[1], t[2])
             rack.addSymbolic(name, size)
     def _size(self, val, units):
@@ -167,17 +167,17 @@ class Cmd_drill(Command):
                 #size = Cmd_drillrack.rackClass.number[val]
                 size = verbs['drillrack'].rackClass.number[val]
             except KeyError:
-                raise CommandSyntax(val.join(['Number drill: ',' not known.']))
+                raise CommandSyntaxError(val.join(['Number drill: ',' not known.']))
         else:
             try:
                 v = float(val)
             except ValueError:
-                raise CommandSyntax('Expected a drill size.')
+                raise CommandSyntaxError('Expected a drill size.')
             units = units if units != '' else 'inch'
             try:
                 size = dimClass.VU(v, units)
             except ValueError as e:
-                raise CommandSyntax(e.args[0])
+                raise CommandSyntaxError(e.args[0])
         return size
     def helptext(self, longhelp = ''):
         yield "drill <size>"
@@ -232,7 +232,7 @@ class Cmd_rule(Command):
             else:
                 rules[ruleName] = setting
         except ValueError:
-            raise CommandSyntax('Rule syntax error.')        
+            raise CommandSyntaxError('Rule syntax error.')        
     def helptext(self, longhelp = ''):
         yield "rule <rule name>  = <value>"
         if longhelp:
@@ -241,17 +241,21 @@ class Cmd_rule(Command):
 class Cmd_fp(Command):
     "Dipatch to footprint plug-in."
     def execute(self, s, warningCallback):
-        "s : <filename> <fp-plug-in> <parameters>"
+        "s : <footprintname> <fp-plug-in> <parameters>"
         t = s.strip().split(' ',1)
-        filename = t[0]
+        footprintname = t[0]
         # Error check
-        if filename == '':
-            raise CommandSyntax('No file name specified.')
+        if footprintname == '':
+            raise CommandSyntaxError('No footprint name specified.')
         if len(t) < 2:
-            raise CommandSyntax('No plugin name specified.')
-        footprint = self.dispatchPlugin(t[1].strip(), warningCallback)
-        if footprint == None: return
-        if filename == '?':
+            raise CommandSyntaxError('No plugin name specified.')
+        # Extract filename, if any.
+        t = t[1].split('>')
+        params, filename = t[0].strip(),t[1].strip() if t[1:] else ''
+        footprint = self.dispatchPlugin(footprintname, params, warningCallback)
+        if not footprint:
+            return # Error messages generated elsewhere -- return silently.
+        if filename == '':
             # Render to screen instead for a quick view.
             for ln in footprint.rendering(warningCallback):
                 print ln
@@ -260,7 +264,7 @@ class Cmd_fp(Command):
                 for ln in footprint.rendering(warningCallback):
                     f.write(ln)
                     f.write('\n')
-    def dispatchPlugin(self, params, warningCallback):
+    def dispatchPlugin(self, footprintname, params, warningCallback):
         t = params.split(' ',1)
         if len(t) < 2:
             t.append('')
@@ -268,20 +272,20 @@ class Cmd_fp(Command):
         try:
             pu = self.plugins[plugin]
         except KeyError:
-            raise CommandSyntax(plugin.join(['Plugin ',' not found.']))
+            raise CommandSyntaxError(plugin.join(['Plugin ',' not found.']))
         try:
-            footprint = pu.parse(puParams, rules, rack, warningCallback)
+            footprint = pu.parse(footprintname, puParams, rules, rack, warningCallback)
         except FootprintException as e:
             print e.msg
             return None
         return footprint
     def helptext(self, longhelp = ''):
         if longhelp == True:
-            yield "fp <filename> <plug-in> <parameters>"
+            yield "fp <footprintname> <plug-in> <parameters> > <filename>"
             yield "  Make footprint using <plug-in> <parameters>, and write to <filename>."
             yield "  To list available plugins: help fp ?"
             yield "  For help on a plug-in: help fp <plug-in name>"
-            yield "  fp ? <plug-in> <parameter ; renders to screen for quick view."
+            yield "  fp <footprintname> <plug-in> <parameter> ; renders to screen for quick view."
         elif len(longhelp) > 0:
             pu = longhelp.strip()
             if pu == '?':
@@ -296,7 +300,7 @@ class Cmd_fp(Command):
                 except KeyError:
                     print 'No plug-in: ',pu
         else:
-            yield "fp <filename> <plug-in> <parameters>"
+            yield "fp <footprintname> <plug-in> <parameters> [ > <filename> ]"
 
 def collectVerbs(moduleDict):
     verbs = {}
@@ -314,7 +318,6 @@ def nullWarningSink(msg):
 
 def dispatchCommand(s, warningSink=nullWarningSink):
     "Parse and dispatch a command to a verb engine."
-    # FIXME: Pass warningSink callback down to callees.
     t = s.strip().split(';')[0] # Strip off comments and leading white space.
     t = t.split(' ',1)
     params = t[1] if len(t) > 1 else ''
@@ -322,7 +325,7 @@ def dispatchCommand(s, warningSink=nullWarningSink):
     try:
         verb = verbs[t[0]]
     except KeyError:
-        raise CommandSyntax(t[0].join(["'","' not a command."]))
+        raise CommandSyntaxError(t[0].join(["'","' not a command."]))
     verb.execute(params, warningSink)
     
 

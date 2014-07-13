@@ -20,7 +20,6 @@
 # Alpha through hole: Rotary encoder RE130F
 
 import footprintcore as fc
-import datetime as dt
 
 class FP_enc(fc.Footprint):
     @classmethod
@@ -31,7 +30,7 @@ class FP_enc(fc.Footprint):
         yield "    RE130F"
         yield "    <others tbw>"
     @classmethod
-    def parse(cls, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warningCallback):
         # Call the standard parameter parser.
         kwspecs = {
             'type':     fc.KWSpec(None, True, False),
@@ -107,4 +106,4 @@ class FP_enc(fc.Footprint):
         # Create the refdes, description, and footprint instance.
         rd = cls.refDes(fc.Pt.MM(0,2),0, rules['minsilk'], '', rules['refdessize'])
         desc = 'Alpha ' + kw['type'] + ' encoder.'
-        return cls(desc, rd, pinSpecs, silk, cmt, keepOuts) 
+        return cls(footprintname, desc, rd, pinSpecs, silk, cmt, keepOuts) 

@@ -36,7 +36,7 @@ Optional rc file is first found of: ./landmaker.rc, ~/.landmaker/landmaker.rc"""
         help='Disable automatic rc file search.')
     parser.add_argument('--rc',nargs=1,
         help='Use explicit rc file instead of automatic file search.')
-    parser.add_argument('--fp',nargs=1,
+    parser.add_argument('--fp',nargs=2,
         help='Render footprint to output.')
     parser.add_argument('--kicad',action='store_true',
         help='Homework for Wayne.')
@@ -61,7 +61,6 @@ def interactive():
     readline.parse_and_bind("tab: complete")
     readline.set_completer(completer)
 
-
     while True:
         try:
             ln = raw_input('> ')
@@ -69,7 +68,7 @@ def interactive():
             break
         try:
             cmd.dispatchCommand(ln, warningsToConsole)
-        except cmd.CommandSyntax as e:
+        except cmd.CommandSyntaxError as e:
             print e.args[0]
         except StopIteration:
             break
@@ -143,7 +142,9 @@ processRc(warningsToConsole)
 
 if args.fp:
     # Execute fp command from command line arguments.
-    footprint = cmd.verbs['fp'].dispatchPlugin(args.fp[0], warningsToConsole)
+    footprintname, params = args.fp 
+    footprint = cmd.verbs['fp'].dispatchPlugin(
+        footprintname, params, warningsToConsole)
     if footprint:
         try:
             for ln in footprint.rendering(warningsToConsole):

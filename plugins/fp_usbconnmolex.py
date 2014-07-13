@@ -23,7 +23,6 @@
 # check min annulus rule carefully
 
 import footprintcore as fc
-import datetime as dt
 
 class FP_usbconnmolex(fc.Footprint):
     @classmethod
@@ -34,7 +33,7 @@ class FP_usbconnmolex(fc.Footprint):
         yield "    54819-0519"
         yield "    <others tbw>"
     @classmethod
-    def parse(cls, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warningCallback):
         # Call the standard parameter parser.
         kwspecs = {
             'type':     fc.KWSpec(None, True, False),
@@ -115,4 +114,4 @@ class FP_usbconnmolex(fc.Footprint):
         # Create the refdes, description, and footprint instance.
         rd = cls.refDes(fc.Pt.MM(0,2),0, rules['minsilk'], '', rules['refdessize'])
         desc = 'Molex ' + kw['type'] + ' USB connector.'
-        return cls(desc, rd, pinSpecs, [], cmt, keepOuts) 
+        return cls(footprintname, desc, rd, pinSpecs, [], cmt, keepOuts) 

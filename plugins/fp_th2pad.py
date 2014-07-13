@@ -17,7 +17,6 @@
 #   
 
 import footprintcore as fc
-import datetime as dt
 
 class FP_th2pad(fc.Footprint):
     @classmethod
@@ -44,7 +43,7 @@ class FP_th2pad(fc.Footprint):
         yield "  calculated, or can be specified in artlen."
         yield "  Rules referenced: maskrelief, minspace, silkwidth, refdessize."
     @classmethod
-    def parse(cls, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warningCallback):
         # Call the standard parameter parser.
         kwspecs = {
             'desc':     fc.KWSpec(None, True, False),
@@ -100,4 +99,4 @@ class FP_th2pad(fc.Footprint):
             ['maskrelief','minspace','minsilk','refdessize'])
         # Create the footprint instance.
         desc = str(kw['desc'])
-        return cls(desc, rd, [pin1, pin2], box, cmt)
+        return cls(footprintname, desc, rd, [pin1, pin2], box, cmt)
