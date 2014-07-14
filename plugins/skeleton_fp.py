@@ -74,3 +74,16 @@ class FP_foo(fc.Footprint):
     # TODO: name your file fp_<yourplugin>.py and leave it
     # laying about in the plugins/ directory where it will be found
     # and loaded by the plug-in manager.
+
+    # Checklist:
+    # ____ parse() takes paramater string, returns instance of footprint.
+    # ____ from_kwargs() takes keyword dictionary, returns instance of fp.
+    # ____ helptext() implemented, matches parse() behavior.
+    # ____ All drills passed through drill rack whenever possible.
+    # ____ Mask relief and clearance taken from rules whenever possible.
+    # ____ Check minimum mask feature rule.
+    # ____ Check minimum annulus rule.
+    # ____ Check minimum clearance rule.
+    # ____ Include standard comments.
+    # ____ No silk off mask.
+    
