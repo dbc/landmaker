@@ -70,6 +70,11 @@ class ParamSyntax(FootprintException):
     def msg(self):
         return "Parameter syntax error: " + self.args[0]
 
+class CanNotRenderError(FootprintException):
+    @property
+    def msg(self):
+        return "Can not render: " + self.args[0]
+
 class InternalError(Exception):
     pass
 
@@ -329,6 +334,12 @@ class Pt(FPCoreObj):
     @classmethod
     def INCH(cls, x, y):
         return cls(Dim.INCH(x), Dim.INCH(y))
+    @classmethod
+    def xy0(cls, x):
+        return cls(x, Dim.VU(0,x.du))
+    @classmethod
+    def x0y(cls, y):
+        return cls(Dim.VU(0,y.du),y)
     def order(self, other):
         return (self, other) if self <= other else (other, self)
     def rectify(self,  other):
@@ -357,6 +368,8 @@ class Pt(FPCoreObj):
         return self.x == other.x
     def alignedy(self, other):
         return self.y == other.y
+    def orthonormal(self, other):
+        return self.alignedx(other) or self.alignedy(other)
     def area(self, other):
         return abs(self.x-other.x) * abs(self.y-other.y)
     def dist(self, other):
@@ -866,7 +879,6 @@ class PinGeometry(FPCoreObj):
     #FIXME: Be sure compPad==None and solderPad==Pad() works, otherwise
     # won't be able to do double-sided edge connectors correctly.
     def __init__(self, compPad, drill=None, solderPad=None, innerPad=None):
-        self.drill = drill
         self.compPad = compPad
         self.drill = drill
         self.solderPad = solderPad
@@ -882,6 +894,8 @@ class PinGeometry(FPCoreObj):
             if self._solderPad == '=':
                 # Trap case where breaking symmetry.
                 self._solderPad = self._compPad
+            # FIXME: if setting compPad equal to solderPad, should
+            # check symmetry and set '=' if necessary.
         except AttributeError:
             pass # _solderPad not yet set.
         self._compPad = aPad
@@ -900,7 +914,8 @@ class PinGeometry(FPCoreObj):
     def solderPad(self, aPad):
         if not(aPad == None or aPad == '=' or isinstance(aPad,Pad)):
             raise ValueError("Solder pad must be None, '=', or Pad().")
-        if aPad == None or aPad == self.compPad:
+        #if aPad == None or aPad == self.compPad:
+        if aPad == self.compPad:
             # Trap redundant solderPad value and force to symmetric.
             self._solderPad = '='
         else:
@@ -932,6 +947,8 @@ class PinGeometry(FPCoreObj):
         if self.drill < rules['mindrill']: return False        
 
 class PinInfo(Primitive):
+    # FIXME: Refactor pin number and pin name down here.
+    # although, PinGang should not reach num and name down here.
     pass
 
 class PinSpec(PinInfo):
@@ -942,7 +959,7 @@ class PinSpec(PinInfo):
             raise TypeError('Expected PinGeometry().')
         self.geo = pinGeometry
         self.rot = rotation
-        if pinName != None:
+        if pinName is not None:
             self._name = str(pinName)
     def reprvals(self):
         l = [self.loc, self.num, self.geo]
@@ -985,6 +1002,40 @@ class PinGang(PinInfo):
         if not min([isinstance(x, PinSpec) for x in l]):
             raise TypeError("List must contain PinSpec()'s.")
         self._silk = l
+
+class ThermalSink(PinInfo):
+    "Primtive defining a thermal sink area."
+    def __init__(self, loc, comp_cu, comp_mask, solder_cu, solder_mask, drills,
+                 pin_number, pin_name = ''):
+        self.loc = loc
+        self.num = int(pin_number)
+        self.name = pin_name if pin_name else str(pin_number)
+        self.comp_cu = self._check_poly(comp_cu)
+        self.comp_mask = self._check_mpoly(comp_mask)
+        self.solder_cu = self._check_poly(solder_cu)
+        self.solder_mask = self._check_mpoly(solder_mask)
+        self.drills = self._check_drills(drills)
+    def _check_poly(self, gon):
+        if not gon:
+            return []
+        if not min([isinstance(x,Pt) for x in gon]):
+            raise ValueError('Polygon must be list of points.')
+        if len(gon) < 3:
+            raise ValueError('Polygon must contain at least 3 points.')
+        return gon
+    def _check_mpoly(self, manygons):
+        if not manygons:
+            return []
+        if not isinstance(manygons[0],list):
+            manygons = [manygons]
+        return [self._check_poly(gons) for gons in manygons]
+    def _check_drills(self, drls):
+        if not drls:
+            return []
+        if not min([isinstance(p,Pt) and isinstance(d,Dim) for
+                    p,d in drls]):
+            raise ValueError('Drill list must be tuples of (Pt(),Dim()).')
+        return drls
     
 class Silk(Primitive):
     def __init__(self, loc, penWidth):
@@ -1145,6 +1196,7 @@ class Footprint(FPCoreObj):
     silkLine = SilkLine
     silkArc = SilkArc
     keepOutRect = KeepOutRect
+    thermalSink = ThermalSink
     def __init__(self, name, description, refdes, pins = [], silk = [], \
                  comments = [], keepOuts = []):
         self.name = str(name) if name is not None else ''
@@ -1244,6 +1296,7 @@ class Footprint(FPCoreObj):
     def _normTokenVals(cls, value_list, default_units):
         # If anything has units, and they all match, use that
         # instead of default.
+        #print repr(value_list),default_units
         consensus_units = None
         for tkn in value_list:
             try:
@@ -1257,7 +1310,8 @@ class Footprint(FPCoreObj):
                 else:
                     consensus_units = u
         u = consensus_units if consensus_units else default_units
-        return [v if not isinstance(v,float) else Dim.VU(v,u) for v in value_list]
+        return [Dim.VU(v,u) if default_units and isinstance(v,float) else v \
+                for v in value_list]
             
     @classmethod
     def standardComments(cls, pluginName, kwDict, rules, ruleList):

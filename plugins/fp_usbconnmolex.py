@@ -107,9 +107,8 @@ class FP_usbconnmolex(fc.Footprint):
         else:
             raise fc.ParamSyntax(str(kw['type']).join(["Unkown type: ","'"]))
         # Make comments
-        cmt = cls.standardComments(cls.__name__.split('_')[2],
-            kw, rules,
-            ['maskrelief','minspace','minannulus','refdessize'])
+        cmt = cls.standardComments(cls.pluginName(), kw, rules,
+            ['maskrelief','minspace','minannulus','refdessize','minsilk'])
         cmt.append('Pins 6 & 7 are case.')
         # Create the refdes, description, and footprint instance.
         rd = cls.refDes(fc.Pt.MM(0,2),0, rules['minsilk'], '', rules['refdessize'])
