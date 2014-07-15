@@ -5,3 +5,6 @@
 *.html
 *.fp
 *.fp-
+*.pcb
+*.pcb-
+PCB.*.backup
