@@ -23,10 +23,13 @@ import datetime as dt
 import os
 import tokenizertools as tt
 from lookaheadtools import LinesOf
+from inspect import stack,getframeinfo
 
 debug = ''
 
-from inspect import stack,getframeinfo
+TAU = m.pi * 2.0
+HALF_PI = m.pi / 2.0
+
 def trace(name, globalVars, localVars=None):
     callerFrameRecord = stack()[1]
     info = getframeinfo(callerFrameRecord[0])
@@ -407,8 +410,10 @@ class Pt(FPCoreObj):
     def minSpan(self, other):
         a,b = self.rectify(other)
         return Dim(min([b.x-a.x, b.y-a.y]), self.x.du)
-    def rotate(self, other, pivot=None):
-        raise NotImplementedError('FIXME')
+    def rotate(self, theta):
+        s = m.sin(theta)
+        c = m.cos(theta)
+        return self.__class__(self.x*c - self.y*s, self.x*s + self.y*c)
     # comparisons
     def __eq__(self, other):
         if other==None:
