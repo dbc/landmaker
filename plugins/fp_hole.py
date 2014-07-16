@@ -103,7 +103,7 @@ class FP_hole(fc.Footprint):
         # construct Pad
         pad = cls.roundPad(kw['pad'], clearance, maskrelief)
         # construct pin geometry
-        geo = cls.pinGeometry(pad, rackDrill)
+        geo = cls.pinGeometry(pad, rackDrill, '=')
         # construct pin specs
         #pinSpecs = [cls.pinSpec(fc.Dim.MIL(0),fc.Dim.MIL(0),1,geo)]
         pinSpecs = [cls.pinSpec(fc.Pt.MIL(0,0),1,geo)]
