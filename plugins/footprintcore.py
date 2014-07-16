@@ -70,6 +70,11 @@ class ParamSyntax(FootprintException):
     def msg(self):
         return "Parameter syntax error: " + self.args[0]
 
+class ParamValueError(FootprintException):
+    @property
+    def msg(self):
+        return "Parameter value error: " + self.args[0]
+
 class CanNotRenderError(FootprintException):
     @property
     def msg(self):
@@ -1312,7 +1317,6 @@ class Footprint(FPCoreObj):
         u = consensus_units if consensus_units else default_units
         return [Dim.VU(v,u) if default_units and isinstance(v,float) else v \
                 for v in value_list]
-            
     @classmethod
     def standardComments(cls, pluginName, kwDict, rules, ruleList):
         "Append a standard set of comments."
@@ -1350,6 +1354,57 @@ class Footprint(FPCoreObj):
     @classmethod
     def pluginName(cls):
         return cls.__name__.split('_')[2]
+    @classmethod
+    def dil_geometry(cls, num_pins, width_oc, pitch_oc, left_geo,
+                     right_geo=None, pad1_geo=None):
+        x_left, x_right, y_top = cls._dil_alt_setup(num_pins, width_oc, pitch_oc)
+        left_pin_locs = [(Pt(x_left, y_top-(pitch_oc*ymult)), n)
+                         for ymult, n in
+                         enumerate([n+1 for n in range(0,num_pins/2)])]
+        right_pin_locs = [(Pt(x_right, y_top-(pitch_oc*ymult)), n)
+                         for ymult, n in
+                         enumerate([num_pins-n for n in range(0,num_pins/2)])]
+        return cls._dil_alt_final(left_geo, right_geo, pad1_geo,
+                                  left_pin_locs, right_pin_locs)
+    @classmethod
+    def alternating_geometry(cls, num_pins, width_oc, pitch_oc, left_geo,
+                     right_geo=None, pad1_geo=None):
+        x_left, x_right, y_top = cls._dil_alt_setup(num_pins, width_oc, pitch_oc)
+        left_pin_locs = [(Pt(x_left, t_top-(pitch_oc*ymult)), n)
+                        for ymult, n in
+                        enumerate([n+1 for n in range(0, num_pins/2, 2)])]
+        right_pin_locs = [(Pt(x_left, t_top-(pitch_oc*ymult)), n)
+                        for ymult, n in
+                        enumerate([n+2 for n in range(0, num_pins/2, 2)])]
+        return cls._dil_alt_final(left_geo, right_geo, pad1_geo,
+                                  left_pin_locs, right_pin_locs)
+    @classmethod
+    def _dil_alt_setup(cls, num_pins, width_oc, pitch_oc):
+        if num_pins % 2:
+            raise ParamValueError('Must have even number of pins.')
+        x_right = width_oc/2.0
+        x_left = -x_right
+        y_top = ((num_pins/2) - 1) * pitch_oc/2.0
+        return (x_left, x_right, y_top)
+    @classmethod
+    def _dil_alt_final(cls, left_geo, right_geo, pad1_geo,
+                       left_pin_locs, right_pin_locs):
+        if not isinstance(left_geo, PinGeometry):
+            raise ValueError('Expected PinGeometry, got: '+repr(left_geo))
+        right_geo = right_geo if right_geo else left_geo
+        pad1_geo = pad1_geo if pad1_geo else left_geo
+        if not isinstance(right_geo, PinGeometry):
+            raise ValueError('Expected PinGeometry, got: '+repr(right_geo))
+        if not isinstance(pad1_geo, PinGeometry):
+            raise ValueError('Expected PinGeometry, got: '+repr(pad1_geo))
+        # Making the assumption that pin #1 is first in left_pin_locs
+        pin1,left_pin_locs = left_pin_locs[0],left_pin_locs[1:]
+        pins = [cls.pinSpec(pin1[0], pin1[1], pad1_geo)]
+        pins.extend([cls.pinSpec(loc, n, left_geo)
+                     for loc, n in left_pin_locs])
+        pins.extend([cls.pinSpec(loc, n, right_geo)
+                     for loc, n in right_pin_locs])
+        return pins
     def rendering(self, warningCallback):
         raise NotImplementedError('Abstract')
 

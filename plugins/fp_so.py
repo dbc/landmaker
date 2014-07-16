@@ -79,15 +79,16 @@ class FP_so(fc.Footprint):
         pinx = (kw['span']-padwidth)/2.0
         pitch = kw['pitch']
         numpins = int(kw['pins'])
-        t = [x+1 for x in range(0,numpins/2)]
-        y = ((numpins/2) - 1) * pitch/2.0
-        leftpins = [] 
-        for pin in t:
-            leftpins.append((pin, fc.Pt(-pinx, y)))
-            y -= pitch
-        rightpins = [((numpins-pin)+1, fc.Pt(pinx, loc.y)) for pin, loc in leftpins]
-        leftpins.extend(rightpins)
-        pins = [cls.pinSpec(loc, num, pingeo) for num, loc in leftpins]
+        pins = cls.dil_geometry(numpins, kw['span']-padwidth, pitch, pingeo)
+##        t = [x+1 for x in range(0,numpins/2)]
+##        y = ((numpins/2) - 1) * pitch/2.0
+##        leftpins = [] 
+##        for pin in t:
+##            leftpins.append((pin, fc.Pt(-pinx, y)))
+##            y -= pitch
+##        rightpins = [((numpins-pin)+1, fc.Pt(pinx, loc.y)) for pin, loc in leftpins]
+##        leftpins.extend(rightpins)
+##        pins = [cls.pinSpec(loc, num, pingeo) for num, loc in leftpins]
         # Make thermal pad.
         thermal_cu = cls._thermal_rect('thermal',**kw)
         if thermal_cu:
