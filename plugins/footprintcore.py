@@ -95,12 +95,13 @@ class FPCoreObj(object):
     def reprvals(self):
         return []
     def mustbe(self, aType, optional_message=None):
-        if not isinstance(self, aType):
-            wanted = aType.__name__
-            got = self.__class__.__name__
-            msg = (optional_message if optional_message else
-                   ''.join(['Expected: ',wanted,', but got: ',got]))
-            raise TypeError(msg)
+        if isinstance(self, aType):
+            return self
+        wanted = aType.__name__
+        got = self.__class__.__name__
+        msg = (optional_message if optional_message else
+               ''.join(['Expected: ',wanted,', but got: ',got]))
+        raise TypeError(msg)
 
 #
 # Dim -- linear dimension with prefered diplay units
@@ -965,8 +966,7 @@ class PinSpec(PinInfo):
     def __init__(self, loc, pinNumber, pinGeometry, rotation = 0, pinName = None):
         super(PinSpec, self).__init__(loc)
         self.num = int(pinNumber)
-        pinGeometry.mustbe(PinGeometry)
-        self.geo = pinGeometry
+        self.geo = pinGeometry.mustbe(PinGeometry)
         self.rot = rotation
         if pinName is not None:
             self._name = str(pinName)
@@ -1000,10 +1000,7 @@ class PinGang(PinInfo):
         return self._relief
     @relief.setter
     def relief(self, v):
-##        if not isinstance(v, Dim):
-##            raise TypeError('Gang mask relief must be Dim().')
-        v.mustbe(Dim, "Gang mask relief must be Dim().")
-        self._relief = v
+        self._relief = v.mustbe(Dim, "Gang mask relief must be Dim().")
     @property
     def pins(self):
         return self._pins
@@ -1057,8 +1054,7 @@ class Silk(Primitive):
         return self._pw
     @penWidth.setter
     def penWidth(self, v):
-        v.mustbe(Dim)
-        self._pw = v
+        self._pw = v.mustbe(Dim)
     
 class SilkText(Silk):
     def __init__(self, loc, rotation, penWidth, text, size):
@@ -1068,7 +1064,7 @@ class SilkText(Silk):
         size.mustbe(Dim)
         if size <= 0.0:
             raise ValueError('Silk width must be > 0.')
-        self.size = size # FIXME: Validate is Positive Dim().
+        self.size = size 
     def reprvals(self):
         #return [self.x, self.y, self.rot, self._pw, self.text, self._sz]
         return [self.loc, self.rot, self.penWidth, self.text, self.size]
@@ -1092,8 +1088,7 @@ class SilkArc(Silk):
     "Fixed radius arc."
     def __init__(self, loc, radius, startAngle, arcAngle, penWidth):
         super(SilkArc, self).__init__(loc, penWidth)
-        radius.mustbe(Dim)
-        self.radius = radius
+        self.radius = radius.mustbe(Dim)
         if startAngle < 0.0 or startAngle > 360.0:
             raise ValueError('Angle must be in range 0..360')
         self.start = startAngle
@@ -1396,10 +1391,8 @@ class Footprint(FPCoreObj):
     def _dil_alt_final(cls, left_geo, right_geo, pad1_geo,
                        left_pin_locs, right_pin_locs):
         left_geo.mustbe(PinGeometry)
-        right_geo = right_geo if right_geo else left_geo
-        pad1_geo = pad1_geo if pad1_geo else left_geo
-        right_geo.mustbe(PinGeometry)
-        pad1_geo.mustbe(PinGeometry)
+        right_geo = right_geo.mustbe(PinGeometry) if right_geo else left_geo
+        pad1_geo = pad1_geo.mustbe(PinGeometry) if pad1_geo else left_geo
         # Making the assumption that pin #1 is first in left_pin_locs
         pin1,left_pin_locs = left_pin_locs[0],left_pin_locs[1:]
         pins = [cls.pinSpec(pin1[0], pin1[1], pad1_geo)]
