@@ -94,6 +94,13 @@ class FPCoreObj(object):
         return s
     def reprvals(self):
         return []
+    def mustbe(self, aType, optional_message=None):
+        if not isinstance(self, aType):
+            wanted = aType.__name__
+            got = self.__class__.__name__
+            msg = (optional_message if optional_message else
+                   ''.join(['Expected: ',wanted,', but got: ',got]))
+            raise TypeError(msg)
 
 #
 # Dim -- linear dimension with prefered diplay units
@@ -589,15 +596,14 @@ class DrillRack(FPCoreObj):
     def reprvals(self):
         return [self._dl, self._symb]
     def addDrill(self, aDrill):
-        if not isinstance(aDrill, Dim):
-            raise TypeError("Drills must be specified as Dim()'s")
+        aDrill.mustbe(Dim, "Drills must be specified as Dim()'s")
         existing = self[aDrill]
         if existing == aDrill: return # Avoid adding redundant drills.
         self._dl.append(aDrill)
         self._dl = sorted(self._dl)
     def addSymbolic(self, aName, aDrill):
-        if not isinstance(aName, str): raise TypeError('Expected string.')
-        if not isinstance(aDrill, Dim): raise TypeError('Drills must be Dim().')
+        aName.mustbe(str)
+        aDrill.mustbe(Dim, 'Drills must be Dim().')
         self._symb[aName]=aDrill
     def __getitem__(self, v):
         # First do number drill or symbolic drill mapping.
@@ -612,7 +618,7 @@ class DrillRack(FPCoreObj):
                     v = self._symb[v]
                 except KeyError:
                     raise ValueError(v.join(['Symbolic drill ',' not found.']))
-        if not isinstance(v, Dim): raise TypeError('Drills must be Dim().')
+        v.mustbe(Dim, "Drills must be Dim().")        
         # Find first drill >= to requested size.
         dli = iter(self._dl)
         try:
@@ -893,8 +899,7 @@ class PinGeometry(FPCoreObj):
         return self._compPad
     @compPad.setter
     def compPad(self, aPad):
-        if not isinstance(aPad, Pad):
-            raise TypeError('Expected Pad().')
+        aPad.mustbe(Pad)
         try:
             if self._solderPad == '=':
                 # Trap case where breaking symmetry.
@@ -909,8 +914,8 @@ class PinGeometry(FPCoreObj):
         return self._drill
     @drill.setter
     def drill(self, aDrill):
-        if not (aDrill == None or isinstance(aDrill, Dim)):
-            raise TypeError('Expected Dim() or None.')
+        if aDrill is not None:
+            aDrill.mustbe(Dim)
         self._drill = aDrill
     @property
     def solderPad(self):
@@ -960,8 +965,7 @@ class PinSpec(PinInfo):
     def __init__(self, loc, pinNumber, pinGeometry, rotation = 0, pinName = None):
         super(PinSpec, self).__init__(loc)
         self.num = int(pinNumber)
-        if not isinstance(pinGeometry, PinGeometry):
-            raise TypeError('Expected PinGeometry().')
+        pinGeometry.mustbe(PinGeometry)
         self.geo = pinGeometry
         self.rot = rotation
         if pinName is not None:
@@ -996,7 +1000,9 @@ class PinGang(PinInfo):
         return self._relief
     @relief.setter
     def relief(self, v):
-        if not isinstance(v, Dim): raise TypeError('Gang mask relief must be Dim().')
+##        if not isinstance(v, Dim):
+##            raise TypeError('Gang mask relief must be Dim().')
+        v.mustbe(Dim, "Gang mask relief must be Dim().")
         self._relief = v
     @property
     def pins(self):
@@ -1051,7 +1057,7 @@ class Silk(Primitive):
         return self._pw
     @penWidth.setter
     def penWidth(self, v):
-        if not isinstance(v, Dim): raise TypeError('Expected Dim().')
+        v.mustbe(Dim)
         self._pw = v
     
 class SilkText(Silk):
@@ -1059,8 +1065,7 @@ class SilkText(Silk):
         super(SilkText, self).__init__(loc, penWidth)
         self.rot = rotation
         self.text = str(text) if text != None else ''
-        if not (isinstance(size, Dim)):
-            raise TypeError('ExpectedDim()')
+        size.mustbe(Dim)
         if size <= 0.0:
             raise ValueError('Silk width must be > 0.')
         self.size = size # FIXME: Validate is Positive Dim().
@@ -1087,7 +1092,7 @@ class SilkArc(Silk):
     "Fixed radius arc."
     def __init__(self, loc, radius, startAngle, arcAngle, penWidth):
         super(SilkArc, self).__init__(loc, penWidth)
-        if not isinstance(radius, Dim): raise TypeError ('radius must be Dim().')
+        radius.mustbe(Dim)
         self.radius = radius
         if startAngle < 0.0 or startAngle > 360.0:
             raise ValueError('Angle must be in range 0..360')
@@ -1209,7 +1214,8 @@ class Footprint(FPCoreObj):
         assert refdes != None
         if isinstance(refdes, str):
             refdes = self.refDes(0,0,0,'textpen',refdes,'refdessize')
-        if not isinstance(refdes, RefDes): raise TypeError('Expected RefDes() or str().')
+        if not isinstance(refdes, RefDes):
+            raise TypeError('Expected RefDes() or str().')
         self.refdes = refdes
         self.pins = pins
         self.silk = silk # FIXME: Add type-checking: must be silk primitives
@@ -1389,14 +1395,11 @@ class Footprint(FPCoreObj):
     @classmethod
     def _dil_alt_final(cls, left_geo, right_geo, pad1_geo,
                        left_pin_locs, right_pin_locs):
-        if not isinstance(left_geo, PinGeometry):
-            raise ValueError('Expected PinGeometry, got: '+repr(left_geo))
+        left_geo.mustbe(PinGeometry)
         right_geo = right_geo if right_geo else left_geo
         pad1_geo = pad1_geo if pad1_geo else left_geo
-        if not isinstance(right_geo, PinGeometry):
-            raise ValueError('Expected PinGeometry, got: '+repr(right_geo))
-        if not isinstance(pad1_geo, PinGeometry):
-            raise ValueError('Expected PinGeometry, got: '+repr(pad1_geo))
+        right_geo.mustbe(PinGeometry)
+        pad1_geo.mustbe(PinGeometry)
         # Making the assumption that pin #1 is first in left_pin_locs
         pin1,left_pin_locs = left_pin_locs[0],left_pin_locs[1:]
         pins = [cls.pinSpec(pin1[0], pin1[1], pad1_geo)]
