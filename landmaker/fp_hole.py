@@ -69,9 +69,9 @@ class FP_hole(fc.Footprint):
             'fit':      fc.KWSpec(None, False, False),
         }
         kw = cls.parseKwargs(params, kwspecs)
-        return cls.fromKwargs(footprintname, rules, rack, warningCallback, **kw)
+        return cls.from_kwargs(footprintname, rules, rack, warningCallback, **kw)
     @classmethod
-    def fromKwargs(cls, footprintname, rules, rack, warningCallback, **kw):
+    def from_kwargs(cls, footprintname, rules, rack, warningCallback, **kw):
         # Pick up general rules
         maskrelief = rules['maskrelief']
         clearance = rules['minspace']

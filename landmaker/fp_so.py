@@ -57,9 +57,9 @@ class FP_so(fc.Footprint):
         kw = cls.parseKwargs(params, cls.kw_specs)
         if kw['pins'] % 2:
             raise fc.ParamSyntax('Must have even number of pins.')
-        return cls.fromKwargs(footprintname, rules, rack, warningcallback, **kw)
+        return cls.from_kwargs(footprintname, rules, rack, warningcallback, **kw)
     @classmethod
-    def fromKwargs(cls, footprintname, rules, rack, warningcallback, **kw):
+    def from_kwargs(cls, footprintname, rules, rack, warningcallback, **kw):
         # Make pin pad.
         try:
             mask = kw['mask']

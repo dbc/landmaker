@@ -33,7 +33,7 @@ class FP_foo(fc.Footprint):
     @classmethod
     def parse(cls, footprintname, params, rules, rack, warningCallback):
         # TODO: Parse the params. parse() must return an instance of
-        # FP_foo, usually, by returning via fromKwargs().
+        # FP_foo, usually, by returning via from_kwargs().
         # Consider using the standard parameter parser built into
         # fc.Footprint.
         # TODO: To use the standard parameter parser, set up KWSpec dict.
@@ -51,15 +51,15 @@ class FP_foo(fc.Footprint):
         # TODO: Call the parameter parser, if you choose to use it.
         # Otherwise, parse the params string any way you like.
         # kw = cls.parseKwargs(params, kwspecs)
-        # Exit via fromKwargs() constructor.
-        return cls.fromKwargs(footprintname, rules, rack, warningCallback, **kw)
+        # Exit via from_kwargs() constructor.
+        return cls.from_kwargs(footprintname, rules, rack, warningCallback, **kw)
     @classmethod
-    def fromKwargs(cls, footprintname, rules, rack, warningCallback, **kw):
+    def from_kwargs(cls, footprintname, rules, rack, warningCallback, **kw):
         # TODO: Construct the footprint model entirely from primitives.
         # The footprint primitives must be instantiated by calling
         # the inherited class vectors provided via the plugin manager.
         # All of the actual footprint construction work should be done
-        # through fromKwargs() to enable the scripting interface.
+        # through from_kwargs() to enable the scripting interface.
 
         # TODO: Construct description (a string) from parameters.
         # TODO: Construct refdes (primitive instance) from parameters.
