@@ -1,4 +1,4 @@
-import plugins.footprintcore as fc
+import landmaker.footprintcore as fc
 import unittest as ut
 
 class TestRoundPadPrimitives(ut.TestCase):

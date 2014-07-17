@@ -35,8 +35,8 @@ setup(
     long_description = '\n'.join([read('README.rst'),read('NEWS.rst')]),
     license='GPL',
     platforms=['any'],
-    packages=['commands','plugins'],
-    scripts=['landmaker'],
+    packages=['landmaker'],
+    scripts=['bin/landmaker'],
     install_requires=['lookaheadtools','tokenizertools'],
     test_suite='tests',
 )

@@ -1,4 +1,4 @@
-import plugins.footprintcore as fc
+import landmaker.footprintcore as fc
 import lookaheadtools as la
 import unittest as ut
 
