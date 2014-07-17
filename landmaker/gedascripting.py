@@ -23,8 +23,6 @@ from landmaker.footprintcore import Dim, DrillRack, RulesDictionary
 for name, cls in r.fp_plugins.items():
     setattr(sys.modules[__name__], name, cls)
 
-d = r.fc.Dim
-
 del name
 del cls
 del r
