@@ -1190,6 +1190,10 @@ class KWParamLexer(tt.RegexTokenizer):
         (r'.',KWToken.typeBad), # Catch-all
     ]
 
+class ArgObject(FPCoreObj):
+    def reprvals(self):
+        return self.__dict__.items()
+
 class Footprint(FPCoreObj):
     # Plugins MUST instantiate primitive and sub-primitive classes
     # via these class variables so that rendering classes may
@@ -1323,6 +1327,16 @@ class Footprint(FPCoreObj):
         u = consensus_units if consensus_units else default_units
         return [Dim.VU(v,u) if default_units and isinstance(v,float) else v \
                 for v in value_list]
+    @classmethod
+    def arg_object(cls, kwargs):
+        "Return an ArgObject made from cls.kwspecs and kwargs."
+        a = ArgObject()
+        for name in cls.kwspecs.keys():
+            try:
+                setattr(a, name, kwargs[name])
+            except KeyError:
+                setattr(a, name, None)
+        return a        
     @classmethod
     def standardComments(cls, pluginName, kwDict, rules, ruleList):
         "Append a standard set of comments."

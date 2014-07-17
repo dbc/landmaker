@@ -20,7 +20,7 @@
 import footprintcore as fc
 from collections import namedtuple
 
-DrillFit=namedtuple('DrillFit','closeFit freeFit')
+DrillFit=namedtuple('DrillFit','close_fit, free_fit')
 
 metric = {
     "M1.0":DrillFit(fc.Dim.MM(1.05),fc.Dim.MM(1.2)),
@@ -47,6 +47,12 @@ metric = {
 number = {}
 
 class FP_hole(fc.Footprint):
+    kwspecs = {
+        'pad':      fc.KWSpec('mm', True, False),
+        'drill':    fc.KWSpec('mm', False, False),
+        'screw':    fc.KWSpec(None, False, False),
+        'fit':      fc.KWSpec(None, False, False),
+    }
     @classmethod
     def helptext(cls):
         yield 'Holes for hardware.'
@@ -62,50 +68,23 @@ class FP_hole(fc.Footprint):
     @classmethod
     def parse(cls, footprintname, params, rules, rack, warningCallback):
         # Call the standard parameter parser.
-        kwspecs = {
-            'pad':      fc.KWSpec('mm', True, False),
-            'drill':    fc.KWSpec(None, False, False),
-            'screw':    fc.KWSpec(None, False, False),
-            'fit':      fc.KWSpec(None, False, False),
-        }
-        kw = cls.parseKwargs(params, kwspecs)
+        kw = cls.parseKwargs(params, cls.kwspecs)
         return cls.from_kwargs(footprintname, rules, rack, warningCallback, **kw)
     @classmethod
     def from_kwargs(cls, footprintname, rules, rack, warningCallback, **kw):
+        args = cls._norm_args(kw)
         # Pick up general rules
         maskrelief = rules['maskrelief']
         clearance = rules['minspace']
         if 't' in fc.debug:
             fc.trace('maskrelief',globals(),locals())
-        # Generate the pin.
-        try:
-            fit = kw['fit']
-            if fit not in ['free','close']:
-                raise fc.ParamSyntax('fit must be one of: "free","close".')
-        except KeyError:
-            fit = 'free'
-        try:
-            drill = kw['drill']
-        except KeyError:
-            try:
-                screw=kw['screw']
-            except KeyError:
-                raise fc.ParamSyntax("Expected one of 'drill' or 'screw'.")
-            try:
-                drillChoices = metric[screw]
-            except KeyError:
-                try:
-                    drillChoices = number[screw]
-                except KeyError:
-                    raise fc.ParamSyntax(screw.join(["drill '","' not found."]))
-            drill = drillChoices.freeFit if fit == 'free' else drillChoices.closeFit
-        rackDrill = rack[drill]
+        # Select drill
+        rackDrill = rack[args.drill]
         # construct Pad
-        pad = cls.roundPad(kw['pad'], clearance, maskrelief)
+        pad = cls.roundPad(args.pad, clearance, maskrelief)
         # construct pin geometry
         geo = cls.pinGeometry(pad, rackDrill, '=')
         # construct pin specs
-        #pinSpecs = [cls.pinSpec(fc.Dim.MIL(0),fc.Dim.MIL(0),1,geo)]
         pinSpecs = [cls.pinSpec(fc.Pt.MIL(0,0),1,geo)]
         # No silk
         silk = []
@@ -117,4 +96,28 @@ class FP_hole(fc.Footprint):
         # Create the refdes, description, and footprint instance.
         rd = cls.refDes(fc.Pt.MM(0,2),0, rules['minsilk'], '', rules['refdessize'])
         desc = 'Screw hole.'
-        return cls(footprintname, desc, rd, pinSpecs, silk, cmt, keepOuts) 
+        return cls(footprintname, desc, rd, pinSpecs, silk, cmt, keepOuts)
+    @classmethod
+    def _norm_args(cls, kwargs):
+        try:
+            if kwargs['fit'] not in ['free','close']:
+                raise fc.ParamValueError('fit must be one of: "free","close".')
+        except KeyError:
+            kwargs['fit'] = 'free'
+        try:
+            drill = kwargs['drill']
+        except KeyError:
+            try:
+                screw=kwargs['screw']
+            except KeyError:
+                raise fc.ParamSyntax("Expected one of 'drill' or 'screw'.")
+            try:
+                drillChoices = metric[screw]
+            except KeyError:
+                try:
+                    drillChoices = number[screw]
+                except KeyError:
+                    raise fc.ParamValueError(screw.join(["drill '","' not found."]))
+            kwargs['drill'] = drillChoices.free_fit if fit == 'free' else drillChoices.close_fit
+        return cls.arg_object(kwargs)
+       
