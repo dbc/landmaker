@@ -1361,27 +1361,43 @@ class Footprint(FPCoreObj):
     def pluginName(cls):
         return cls.__name__.split('_')[2]
     @classmethod
+    def pin_num_generator(cls, start_num, pin_num_step=1):
+        "Generator yielding pin numbers in stepped sequence."
+        n = start_num
+        while True:
+            yield n
+            n += pin_num_step
+            assert n > 0
+    @classmethod   
+    def pin_row(cls, p1, p2, num_pins, start_num, pin_num_step=1):
+        "Returns list of (pin_num, location) tuples from seed values."
+        pitch = p2-p1
+        pin_num = cls.pin_num_generator(start_num, pin_num_step)
+        return [(next(pin_num),p1+pitch*i) for i in range(num_pins)]
+    @classmethod
     def dil_geometry(cls, num_pins, width_oc, pitch_oc, left_geo,
                      right_geo=None, pad1_geo=None):
         x_left, x_right, y_top = cls._dil_alt_setup(num_pins, width_oc, pitch_oc)
-        left_pin_locs = [(Pt(x_left, y_top-(pitch_oc*ymult)), n)
-                         for ymult, n in
-                         enumerate([n+1 for n in range(0,num_pins/2)])]
-        right_pin_locs = [(Pt(x_right, y_top-(pitch_oc*ymult)), n)
-                         for ymult, n in
-                         enumerate([num_pins-n for n in range(0,num_pins/2)])]
+        p1,p2 = Pt(x_left, y_top), Pt(x_left, y_top+pitch_oc)
+        left_pin_locs = cls.pin_row(p1, p2, num_pins/2, 1)
+        p1,p2 = Pt(x_right, y_top), Pt(x_right, y_top+pitch_oc)
+        right_pin_locs = cls.pin_row(p1, p2, num_pins/2, num_pins, -1)
         return cls._dil_alt_final(left_geo, right_geo, pad1_geo,
                                   left_pin_locs, right_pin_locs)
     @classmethod
     def alternating_geometry(cls, num_pins, width_oc, pitch_oc, left_geo,
                      right_geo=None, pad1_geo=None):
         x_left, x_right, y_top = cls._dil_alt_setup(num_pins, width_oc, pitch_oc)
-        left_pin_locs = [(Pt(x_left, t_top-(pitch_oc*ymult)), n)
-                        for ymult, n in
-                        enumerate([n+1 for n in range(0, num_pins/2, 2)])]
-        right_pin_locs = [(Pt(x_left, t_top-(pitch_oc*ymult)), n)
-                        for ymult, n in
-                        enumerate([n+2 for n in range(0, num_pins/2, 2)])]
+        p1, p2 = Pt(x_left, y_top), Pt(x_left, y_top+pitch_oc)
+        left_pin_locs = cls.pin_row(p1, p2, num_pins/2, 1, 2)
+        p2, p2 = Pt(x_right, y_top), Pt(x_right, y_top + pitch_oc)
+        right_pin_locs = cls.pin_row(p1, p2, num_pins/2, 2, 2)
+##        left_pin_locs = [(Pt(x_left, t_top-(pitch_oc*ymult)), n)
+##                        for ymult, n in
+##                        enumerate([n+1 for n in range(0, num_pins/2, 2)])]
+##        right_pin_locs = [(Pt(x_left, t_top-(pitch_oc*ymult)), n)
+##                        for ymult, n in
+##                        enumerate([n+2 for n in range(0, num_pins/2, 2)])]
         return cls._dil_alt_final(left_geo, right_geo, pad1_geo,
                                   left_pin_locs, right_pin_locs)
     @classmethod
@@ -1400,11 +1416,11 @@ class Footprint(FPCoreObj):
         pad1_geo = pad1_geo.mustbe(PinGeometry) if pad1_geo else left_geo
         # Making the assumption that pin #1 is first in left_pin_locs
         pin1,left_pin_locs = left_pin_locs[0],left_pin_locs[1:]
-        pins = [cls.pinSpec(pin1[0], pin1[1], pad1_geo)]
+        pins = [cls.pinSpec(pin1[1], pin1[0], pad1_geo)]
         pins.extend([cls.pinSpec(loc, n, left_geo)
-                     for loc, n in left_pin_locs])
+                     for n, loc in left_pin_locs])
         pins.extend([cls.pinSpec(loc, n, right_geo)
-                     for loc, n in right_pin_locs])
+                     for n, loc in right_pin_locs])
         return pins
     def rendering(self, warningCallback):
         raise NotImplementedError('Abstract')

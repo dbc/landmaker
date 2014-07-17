@@ -22,8 +22,8 @@ import os
 import sys
 import argparse
 import readline
-import commands.commandcore as cmd
-import plugins.footprintcore as fpc
+import landmaker.commandcore as cmd
+import landmaker.footprintcore as fpc
 
 
 def processArgs():
@@ -133,9 +133,9 @@ if 'a' in args.debug:
     print 'args:',args
 
 if args.kicad:
-    import plugins.kicadrenderer as pl
+    import landmaker.kicadrenderer as pl
 else:
-    import plugins.gedarenderer as pl
+    import landmaker.gedarenderer as pl
     
 init(warningsToConsole)
 processRc(warningsToConsole)
