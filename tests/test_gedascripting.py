@@ -14,5 +14,5 @@ class TestScripting(ut.TestCase):
         self.rules['minsilk'] = s.Dim('8mil')
 
     def test_00hole01(self):
-        fp = s.hole.fromKwargs('hole01',self.rules,self.rack,warning_sink,
+        fp = s.hole.from_kwargs('hole01',self.rules,self.rack,warning_sink,
             drill=s.Dim('0.02inch'), pad=s.Dim('35mil'))
