@@ -366,9 +366,9 @@ class Pt(FPCoreObj):
         p1,p2 = self.rectify(other)
         org = Pt.MM(0,0)
         return p1 < org and org < p2
-    def leftOf(self, other):
+    def left_of(self, other):
         return self.x < other.x
-    def rightOf(self, other):
+    def right_of(self, other):
         return self.x > other.x
     def below(self, other):
         return self.y < other.y
@@ -389,7 +389,7 @@ class Pt(FPCoreObj):
     def bearing(self, other):
         raise NotImplementedError('FIXME')
     @property
-    def onAxis(self):
+    def on_axis(self):
         "True if on either X or Y axis."
         # FIXME: write unit test
         return self.x == 0.0 or self.y == 0.0
@@ -401,7 +401,7 @@ class Pt(FPCoreObj):
     def refloy(self):
         "Reflect over Y axis."
         return self.__class__(-self.x, self.y)
-    def minSpan(self, other):
+    def min_span(self, other):
         a,b = self.rectify(other)
         return Dim(min([b.x-a.x, b.y-a.y]), self.x.du)
     def rotate(self, theta):
@@ -776,7 +776,7 @@ class SquarePad(Pad):
         w2 = self.width/2.0
         ll,ur = Pt(-w2,-w2),Pt(w2,w2)
         for p in other.extents():
-            if p.leftOf(ll) or p.below(ll) or p.rightOf(ur) or p.above(ur):
+            if p.left_of(ll) or p.below(ll) or p.right_of(ur) or p.above(ur):
                 return False
         return True
     def annulus(self, aDrill):
@@ -836,9 +836,9 @@ class RectPad(Pad):
                 pt(self.ll.x, self.ur.y), pt(self.ur.x, self.ll.y)]
     def covers(self, other):
         for p in other.extents():
-            if p.leftOf(self.ll): return False
+            if p.left_of(self.ll): return False
             if p.below(self.ll): return False
-            if p.rightOf(self.ur): return False
+            if p.right_of(self.ur): return False
             if p.above(self.ur): return False
         return True
     def annulus(self, aDrill):
@@ -877,7 +877,7 @@ class RoundedRectPad(RectPad):
     @radius.setter
     def radius(self, v):
         r = Dim(v)
-        halfSpan = self.ll.minSpan(self.ur)/2.0
+        halfSpan = self.ll.min_span(self.ur)/2.0
         if r and r > halfSpan:
             raise ValueError('Radius larger than 1/2 width.')
         self._radius = r

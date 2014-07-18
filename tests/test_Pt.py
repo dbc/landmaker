@@ -35,8 +35,8 @@ class TestPt(ut.TestCase):
         pass
 
     def test_05halfplanecomp(self):
-        self.assertTrue(self.p1.leftOf(self.p2))
-        self.assertTrue(self.p2.rightOf(self.p1))
+        self.assertTrue(self.p1.left_of(self.p2))
+        self.assertTrue(self.p2.right_of(self.p1))
         self.assertTrue(self.p3.below(self.p4))
         self.assertTrue(self.p5.above(self.p3))
 
