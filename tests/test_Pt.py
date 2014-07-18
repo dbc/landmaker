@@ -86,9 +86,9 @@ class TestPt(ut.TestCase):
         self.assertTrue(d >= fc.Dim.MM(2*1.41))
         self.assertTrue(d <= fc.Dim.MM(2*1.42))
 
-    def test_18spansOrg(self):
-        self.assertFalse(self.p1.spansOrg(self.p2))
-        self.assertTrue((-self.p1).spansOrg(self.p2))
+    def test_18spans_org(self):
+        self.assertFalse(self.p1.spans_org(self.p2))
+        self.assertTrue((-self.p1).spans_org(self.p2))
 
     def test_19repr(self):
         self.assertTrue(repr(self.p1)=="Pt(Dim(1.0,'mm'),Dim(1.0,'mm'))")

@@ -111,15 +111,15 @@ class FPCoreObj(object):
 #
 class Dim(FPCoreObj):
     "Linear dimension carrying along prefered display units."
-    mmPerMil = 0.0254
-    validDisplayUnits = frozenset(['mm','mil','inch'])
+    mm_per_mil = 0.0254
+    valid_display_units = frozenset(['mm','mil','inch'])
     def __init__(self, mmValue, displayUnits=None):
         if displayUnits:
             self._v = float(mmValue)
             self.du = displayUnits
         else:
             if isinstance(mmValue,str):
-                t = self.__class__.fromStr(mmValue)
+                t = self.__class__.from_str(mmValue)
                 self._v = t._v
                 self.du = t.du
             elif isinstance(mmValue,Dim):
@@ -129,13 +129,6 @@ class Dim(FPCoreObj):
                 return None # FIXME: add unit test
             else:
                 raise ValueError(' '.join(['Can not convert',repr(mmValue),repr(displayUnits),'to Dim.']))
-##        if isinstance(mmValue,Dim):
-##            displayUnits = mmValue.du
-##        elif isinstance(mmValue, str):
-##            return self.__class__.parse(mmValue)
-##        # canonical value is millimeters.
-##        self._v = float(mmValue)
-##        self.du = displayUnits
     def reprvals(self):
         return [self._v, self.du]
     @property
@@ -143,7 +136,7 @@ class Dim(FPCoreObj):
         return self._du
     @du.setter
     def du(self, displayUnits):
-        if not displayUnits in self.validDisplayUnits:
+        if not displayUnits in self.valid_display_units:
             raise ValueError (str(displayUnits) + ' not a valid display unit.')
         self._du = displayUnits
     def __str__(self):
@@ -163,11 +156,11 @@ class Dim(FPCoreObj):
     @classmethod
     def MIL(cls,v):
         "Construct from mils."
-        return cls(float(v) * cls.mmPerMil, 'mil')
+        return cls(float(v) * cls.mm_per_mil, 'mil')
     @classmethod
     def INCH(cls,v):
         "Construct from inches."
-        return cls(float(v) * cls.mmPerMil * 1000.0, 'inch')
+        return cls(float(v) * cls.mm_per_mil * 1000.0, 'inch')
     @classmethod
     def DRILL(cls,v):
         "Construct from #nn drill number."
@@ -187,7 +180,7 @@ class Dim(FPCoreObj):
             return cls.INCH(v)
         raise ValueError(repr(displayUnits) + ' is not a valid display unit.')
     @classmethod
-    def fromStr(cls, s, defaultUnits=None):
+    def from_str(cls, s, defaultUnits=None):
         "Construct from string consisting of number and unit keyword."
         mo = re.match(r'([0-9.]+)(\s*)(mm|mil|inch|in)?\Z', s.strip())
         if mo:
@@ -198,25 +191,25 @@ class Dim(FPCoreObj):
             return cls.DRILL(s)
         else:
             raise ValueError(s + ' not convertable to Dim().')
-    @classmethod
-    def guessDu(cls, dimList, du):
-        "Try to extract display units from a list of objects that might be Dim()'s."
-        for d in dimList:
-            try:
-                return d.du
-            except AttributeError:
-                pass
-        return du
-    @classmethod
-    def OrZero(cls, v, du):
-        "Make sure v is a Dim(), or turn a zero into a Dim."
-        return v if isinstance(v, cls) else cls(0, du)
-    @classmethod
-    def OrNone(cls, v):
-        "Make sure v is either a Dim() or None."
-        if isinstance(v, cls) or v == None:
-            return v
-        raise TypeError('Expected Dim() or None.')
+##    @classmethod
+##    def guessDu(cls, dimList, du):
+##        "Try to extract display units from a list of objects that might be Dim()'s."
+##        for d in dimList:
+##            try:
+##                return d.du
+##            except AttributeError:
+##                pass
+##        return du
+##    @classmethod
+##    def OrZero(cls, v, du):
+##        "Make sure v is a Dim(), or turn a zero into a Dim."
+##        return v if isinstance(v, cls) else cls(0, du)
+##    @classmethod
+##    def OrNone(cls, v):
+##        "Make sure v is either a Dim() or None."
+##        if isinstance(v, cls) or v == None:
+##            return v
+##        raise TypeError('Expected Dim() or None.')
     @property
     def mm(self):
         "Value in millimeters."
@@ -227,10 +220,10 @@ class Dim(FPCoreObj):
     @property
     def mil(self):
         "Value in thousanths of inch."
-        return self._v / self.mmPerMil
+        return self._v / self.mm_per_mil
     @mil.setter
     def mil(self, v):
-        self._v = float(v) * self.mmPerMil
+        self._v = float(v) * self.mm_per_mil
     @property
     def inch(self):
         "Value in inches."
@@ -260,6 +253,7 @@ class Dim(FPCoreObj):
     def __float__(self):
         return self._v
     def _scale(self, other):
+        "Ensures unit consistency for addition operations."
         if isinstance(other,Dim):
             # Cool, already a Dim()
             return float(other)
@@ -315,7 +309,7 @@ class Pt(FPCoreObj):
     def __init__(self, x, y=None):
         # In all cases below, we depend on the x.setter, y.setter to call Dim()
         if y == None:
-            # try to unpack an iterable, let exception bubble up.
+            # Try to unpack an iterable, let any exceptions bubble up.
             self.x, self.y = x
         else:
             self.x = x
@@ -367,7 +361,7 @@ class Pt(FPCoreObj):
         p1 = self.__class__(min(xs), min(ys))
         p2 = self.__class__(max(xs), max(ys))
         return p1, p2
-    def spansOrg(self, other):
+    def spans_org(self, other):
         "True if rectangle defined by self,other contains Pt(0,0)."
         p1,p2 = self.rectify(other)
         org = Pt.MM(0,0)
@@ -402,11 +396,11 @@ class Pt(FPCoreObj):
     @property
     def reflox(self):
         "Reflect over X axis."
-        return Pt(self.x, -self.y)
+        return self.__class__(self.x, -self.y)
     @property
     def refloy(self):
         "Reflect over Y axis."
-        return Pt(-self.x, self.y)
+        return self.__class__(-self.x, self.y)
     def minSpan(self, other):
         a,b = self.rectify(other)
         return Dim(min([b.x-a.x, b.y-a.y]), self.x.du)
@@ -436,22 +430,22 @@ class Pt(FPCoreObj):
     # arithmetic
     # add/subtract points.
     def __add__(self, other):
-        return Pt(self.x + other.x, self.y + other.y)
+        return self.__class__(self.x + other.x, self.y + other.y)
     def __sub__(self, other):
-        return Pt(self.x - other.x, self.y - other.y)
+        return self.__class__(self.x - other.x, self.y - other.y)
     def __neg__(self):
-        return Pt(-self.x, -self.y)
+        return self.__class__(-self.x, -self.y)
     def __pos__(self):
-        return Pt(self.x, self.y)
+        return self.__class__(self.x, self.y)
     # Multiply/divide point by a scalar (float or Dim)
     def __mul__(self, other):
         m = float(other)
-        return Pt(self.x*m, self.y*m)
+        return self.__class__(self.x*m, self.y*m)
     def __rmul__(self, other):
         return self.__mul__(other)
     def __div__(self, other):
         m = float(other)
-        return Pt(self.x/m, self.y/m)
+        return self.__class__(self.x/m, self.y/m)
     # __rdiv__ is non-sensical
     # Other ops
     def __len__(self):
@@ -794,7 +788,7 @@ class RectPad(Pad):
     def __init__(self, p1, p2, clearance, maskRelief):
         Pad.__init__(self, clearance, maskRelief)
         # FIXME: Should call Pt() constructors? or type check?
-        if p1.spansOrg(p2):
+        if p1.spans_org(p2):
             self.ll,self.ur = p1.rectify(p2)
         else:
             raise ValueError('Pad must surround (0,0).')

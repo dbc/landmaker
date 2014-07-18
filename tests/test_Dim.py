@@ -49,7 +49,7 @@ class TestDim(ut.TestCase):
         self.assertEqual(float(self.mm1mm),1.0)
 
     def test_04fromStr(self):
-        d = fc.Dim.fromStr('3.0 mm')
+        d = fc.Dim.from_str('3.0 mm')
         self.assertEqual(d, fc.Dim.MM(3))
 
  
