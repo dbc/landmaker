@@ -8,3 +8,5 @@
 *.pcb
 *.pcb-
 PCB.*.backup
+*.egg/*
+venv
