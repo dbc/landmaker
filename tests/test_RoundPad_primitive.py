@@ -9,7 +9,7 @@ class TestRoundPadPrimitives(ut.TestCase):
     def test_00constructors(self):
         self.assertEqual(self.p1.dia,fc.Dim.MIL(55))
         self.assertEqual(self.p1.clearance,fc.Dim.MIL(8))
-        self.assertEqual(self.p1.maskRelief,fc.Dim.MIL(4))
+        self.assertEqual(self.p1.mask_relief,fc.Dim.MIL(4))
 
     def test_01repr(self):
         self.assertEqual(repr(self.p1),"RoundPad(Dim(1.397,'mil'),Dim(0.2032,'mil'),Dim(0.1016,'mil'))")
@@ -34,10 +34,10 @@ class TestRoundPadPrimitives(ut.TestCase):
     def test_05annulus(self):
         self.assertEqual(self.p1.annulus(fc.Dim('35mil')),fc.Dim.MIL(10))
     
-    def test_06validAnnulus(self):
+    def test_06valid_annulus(self):
         r = fc.RulesDictionary({'minannulus':fc.Dim('10mil')})
-        self.assertTrue(self.p1.validAnnulus(fc.Dim('35mil'),r))
-        self.assertFalse(self.p1.validAnnulus(fc.Dim('36mil'),r))
+        self.assertTrue(self.p1.valid_annulus(fc.Dim('35mil'),r))
+        self.assertFalse(self.p1.valid_annulus(fc.Dim('36mil'),r))
     
     
 

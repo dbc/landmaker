@@ -31,7 +31,7 @@ class FP_foo(fc.Footprint):
         yield "Yield lines of help text here."
         yield "  They will be displayed by: 'help fp foo'." 
     @classmethod
-    def parse(cls, footprintname, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warning_callback):
         # TODO: Parse the params. parse() must return an instance of
         # FP_foo, usually, by returning via from_kwargs().
         # Consider using the standard parameter parser built into
@@ -50,11 +50,11 @@ class FP_foo(fc.Footprint):
         #}
         # TODO: Call the parameter parser, if you choose to use it.
         # Otherwise, parse the params string any way you like.
-        # kw = cls.parseKwargs(params, kwspecs)
+        # kw = cls.parse_kwargs(params, kwspecs)
         # Exit via from_kwargs() constructor.
-        return cls.from_kwargs(footprintname, rules, rack, warningCallback, **kw)
+        return cls.from_kwargs(footprintname, rules, rack, warning_callback, **kw)
     @classmethod
-    def from_kwargs(cls, footprintname, rules, rack, warningCallback, **kw):
+    def from_kwargs(cls, footprintname, rules, rack, warning_callback, **kw):
         # TODO: Construct the footprint model entirely from primitives.
         # The footprint primitives must be instantiated by calling
         # the inherited class vectors provided via the plugin manager.

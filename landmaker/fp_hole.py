@@ -66,12 +66,12 @@ class FP_hole(fc.Footprint):
         yield '    fit="free" ; the default'
         yield '    fit="close" '
     @classmethod
-    def parse(cls, footprintname, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warning_callback):
         # Call the standard parameter parser.
-        kw = cls.parseKwargs(params, cls.kwspecs)
-        return cls.from_kwargs(footprintname, rules, rack, warningCallback, **kw)
+        kw = cls.parse_kwargs(params, cls.kwspecs)
+        return cls.from_kwargs(footprintname, rules, rack, warning_callback, **kw)
     @classmethod
-    def from_kwargs(cls, footprintname, rules, rack, warningCallback, **kw):
+    def from_kwargs(cls, footprintname, rules, rack, warning_callback, **kw):
         args = cls._norm_args(kw)
         # Pick up general rules
         maskrelief = rules['maskrelief']
@@ -91,7 +91,7 @@ class FP_hole(fc.Footprint):
         # No keep-outs
         keepOuts = []
         # Make comments
-        cmt = cls.standardComments(cls.pluginName(), kw, rules,
+        cmt = cls.standard_comments(cls.plugin_name(), kw, rules,
             ['maskrelief','minspace','refdessize'])
         # Create the refdes, description, and footprint instance.
         rd = cls.refDes(fc.Pt.MM(0,2),0, rules['minsilk'], '', rules['refdessize'])

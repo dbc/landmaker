@@ -44,7 +44,7 @@ class TestRoundPadPrimitives(ut.TestCase):
     def test_06annulus(self):
         self.assertEqual(self.p1.annulus(fc.Dim.MIL(30)),fc.Dim.MIL(10))
         
-    def test_NNvalidAnnulus(self):
+    def test_NNvalid_annulus(self):
         pass # FIXME
 
     

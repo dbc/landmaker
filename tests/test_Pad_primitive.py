@@ -8,7 +8,7 @@ class TestPadPrimitives(ut.TestCase):
 
     def test_00constructors(self):
         self.assertTrue(self.p1.clearance == fc.Dim.MIL(10))
-        self.assertTrue(self.p1.maskRelief == fc.Dim.MIL(8))
+        self.assertTrue(self.p1.mask_relief == fc.Dim.MIL(8))
 
     def test_01repr(self):
         self.assertEqual(repr(self.p1),"Pad(Dim(0.254,'mil'),Dim(0.2032,'mil'))")

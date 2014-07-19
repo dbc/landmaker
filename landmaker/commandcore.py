@@ -27,14 +27,14 @@ class CommandSyntaxError(Exception):
 
 class Command(object):
     "Base class for all command verbs."
-    def execute(self, s, warningCallback):
+    def execute(self, s, warning_callback):
         raise NotImplementedError('Abstract')
     def helptext(self, longhelp = ''):
         c,v = self.__class__.__name__.split('_')
         yield 'No help for ' + v
 
 class Cmd_quit(Command):
-    def execute(self, s, warningCallback):
+    def execute(self, s, warning_callback):
         raise StopIteration
     def helptext(self, longhelp=''):
         yield 'quit'
@@ -42,7 +42,7 @@ class Cmd_quit(Command):
             yield '  exits landmaker'
     
 class Cmd_help(Command):
-    def execute(self, s, warningCallback):
+    def execute(self, s, warning_callback):
         if s == '':
             v = verbs.keys()
             v.sort()
@@ -69,7 +69,7 @@ class Cmd_help(Command):
             
 class Cmd_include(Command):
     breadcrumbs = set()
-    def execute(self, s, warningCallback):
+    def execute(self, s, warning_callback):
         "s : <filename>"
         s = s.strip()
         if s == '':
@@ -87,7 +87,7 @@ class Cmd_include(Command):
                 if 'i' in debug:
                     print 'including:',ln
                 try:
-                    dispatchCommand(ln, warningCallback)
+                    dispatchCommand(ln, warning_callback)
                 except CommandSyntaxError as e:
                     print 'Error in batch file {0:s}:'.format(filename)
                     print e.args[0]
@@ -100,7 +100,7 @@ class Cmd_include(Command):
     
 class Cmd_drillrack(Command):
     "Set/inspect drill rack."
-    def execute(self, s, warningCallback):
+    def execute(self, s, warning_callback):
         "s : [ <rack name> ]"
         if s == '':
             print 'Available drill racks:'
@@ -145,7 +145,7 @@ class Cmd_drillrack(Command):
 
 class Cmd_drill(Command):
     "Add drills to drill rack."
-    def execute(self, s, warningCallback):
+    def execute(self, s, warning_callback):
         "s : <size>"
         t = s.split(' ')
         if t[0] == '':
@@ -154,13 +154,13 @@ class Cmd_drill(Command):
             t.append('')
         if t[0][0] in '0123456789#.':
             size = self._size(t[0], t[1])
-            rack.addDrill(size)
+            rack.add_drill(size)
         else:
             name = t[0]
             if t[1] == '':
                 raise CommandSyntaxError('Must specify drill size.')
             size = self._size(t[1], t[2])
-            rack.addSymbolic(name, size)
+            rack.add_symbolic(name, size)
     def _size(self, val, units):
         if val[0] == '#':
             try:
@@ -191,7 +191,7 @@ class Cmd_drill(Command):
 
 class Cmd_ruleset(Command):
     "Set/view design rule set."
-    def execute(self, s, warningCallback):
+    def execute(self, s, warning_callback):
         if s == '':
             print 'Available rulesets:'
             for name in self.ruleSets:
@@ -221,7 +221,7 @@ class Cmd_ruleset(Command):
     
 class Cmd_rule(Command):
     "Add design rule."
-    def execute(self, s, warningCallback):
+    def execute(self, s, warning_callback):
         "s : <rulename> = <value> <units>"
         try:
             ruleName, setting = [x.strip() for x in s.split('=')]
@@ -240,7 +240,7 @@ class Cmd_rule(Command):
 
 class Cmd_fp(Command):
     "Dipatch to footprint plug-in."
-    def execute(self, s, warningCallback):
+    def execute(self, s, warning_callback):
         "s : <footprintname> <fp-plug-in> <parameters>"
         t = s.strip().split(' ',1)
         footprintname = t[0]
@@ -252,19 +252,19 @@ class Cmd_fp(Command):
         # Extract filename, if any.
         t = t[1].split('>')
         params, filename = t[0].strip(),t[1].strip() if t[1:] else ''
-        footprint = self.dispatchPlugin(footprintname, params, warningCallback)
+        footprint = self.dispatchPlugin(footprintname, params, warning_callback)
         if not footprint:
             return # Error messages generated elsewhere -- return silently.
         if filename == '':
             # Render to screen instead for a quick view.
-            for ln in footprint.rendering(warningCallback):
+            for ln in footprint.rendering(warning_callback):
                 print ln
         else:
             with open(filename,'w') as f:
-                for ln in footprint.rendering(warningCallback):
+                for ln in footprint.rendering(warning_callback):
                     f.write(ln)
                     f.write('\n')
-    def dispatchPlugin(self, footprintname, params, warningCallback):
+    def dispatchPlugin(self, footprintname, params, warning_callback):
         t = params.split(' ',1)
         if len(t) < 2:
             t.append('')
@@ -274,7 +274,7 @@ class Cmd_fp(Command):
         except KeyError:
             raise CommandSyntaxError(plugin.join(['Plugin ',' not found.']))
         try:
-            footprint = pu.parse(footprintname, puParams, rules, rack, warningCallback)
+            footprint = pu.parse(footprintname, puParams, rules, rack, warning_callback)
         except FootprintException as e:
             print e.msg
             return None

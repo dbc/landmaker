@@ -113,32 +113,32 @@ class Dim(FPCoreObj):
     "Linear dimension carrying along prefered display units."
     mm_per_mil = 0.0254
     valid_display_units = frozenset(['mm','mil','inch'])
-    def __init__(self, mmValue, displayUnits=None):
-        if displayUnits:
-            self._v = float(mmValue)
-            self.du = displayUnits
+    def __init__(self, mm_value, display_units=None):
+        if display_units:
+            self._v = float(mm_value)
+            self.du = display_units
         else:
-            if isinstance(mmValue,str):
-                t = self.__class__.from_str(mmValue)
+            if isinstance(mm_value,str):
+                t = self.__class__.from_str(mm_value)
                 self._v = t._v
                 self.du = t.du
-            elif isinstance(mmValue,Dim):
-                self._v = mmValue._v
-                self.du = mmValue.du
-            elif mmValue == None:
+            elif isinstance(mm_value,Dim):
+                self._v = mm_value._v
+                self.du = mm_value.du
+            elif mm_value == None:
                 return None # FIXME: add unit test
             else:
-                raise ValueError(' '.join(['Can not convert',repr(mmValue),repr(displayUnits),'to Dim.']))
+                raise ValueError(' '.join(['Can not convert',repr(mm_value),repr(display_units),'to Dim.']))
     def reprvals(self):
         return [self._v, self.du]
     @property
     def du(self):
         return self._du
     @du.setter
-    def du(self, displayUnits):
-        if not displayUnits in self.valid_display_units:
-            raise ValueError (str(displayUnits) + ' not a valid display unit.')
-        self._du = displayUnits
+    def du(self, display_units):
+        if not display_units in self.valid_display_units:
+            raise ValueError (str(display_units) + ' not a valid display unit.')
+        self._du = display_units
     def __str__(self):
         if self.du == 'mil':
             v = self.mil
@@ -170,22 +170,22 @@ class Dim(FPCoreObj):
         except:
             raise ValueError(v + ' drill size not found.')
     @classmethod
-    def VU(cls, v, displayUnits):
+    def VU(cls, v, display_units):
         "Construct from display units specified in variable."
-        if displayUnits in ['mil','thou']:
+        if display_units in ['mil','thou']:
             return cls.MIL(v)
-        if displayUnits == 'mm':
+        if display_units == 'mm':
             return cls.MM(v)
-        if displayUnits in ['inch','in']:
+        if display_units in ['inch','in']:
             return cls.INCH(v)
-        raise ValueError(repr(displayUnits) + ' is not a valid display unit.')
+        raise ValueError(repr(display_units) + ' is not a valid display unit.')
     @classmethod
-    def from_str(cls, s, defaultUnits=None):
+    def from_str(cls, s, default_units=None):
         "Construct from string consisting of number and unit keyword."
         mo = re.match(r'([0-9.]+)(\s*)(mm|mil|inch|in)?\Z', s.strip())
         if mo:
             v = float(mo.group(1))
-            du = mo.group(3) if mo.group(3) else defaultUnits
+            du = mo.group(3) if mo.group(3) else default_units
             return cls.VU(v,du)
         elif s.startswith('#'):
             return cls.DRILL(s)
@@ -586,8 +586,8 @@ class DrillRack(FPCoreObj):
         '#Y': Dim.INCH(0.404),
         '#Z': Dim.INCH(0.413),
     }
-    def __init__(self, drillList = [], symbolic={}):
-        self._dl = sorted(drillList)
+    def __init__(self, drill_list = [], symbolic={}):
+        self._dl = sorted(drill_list)
         self._symb = symbolic
     def drills(self):
         return self._dl[:]
@@ -595,13 +595,13 @@ class DrillRack(FPCoreObj):
         return self._symb.copy()
     def reprvals(self):
         return [self._dl, self._symb]
-    def addDrill(self, aDrill):
+    def add_drill(self, aDrill):
         aDrill.mustbe(Dim, "Drills must be specified as Dim()'s")
         existing = self[aDrill]
         if existing == aDrill: return # Avoid adding redundant drills.
         self._dl.append(aDrill)
         self._dl = sorted(self._dl)
-    def addSymbolic(self, aName, aDrill):
+    def add_symbolic(self, aName, aDrill):
         aName.mustbe(str)
         aDrill.mustbe(Dim, 'Drills must be Dim().')
         self._symb[aName]=aDrill
@@ -633,9 +633,9 @@ class DrillRack(FPCoreObj):
             return v
 
 class NoRack(DrillRack):
-    def addDrill(self, aDrill):
+    def add_drill(self, aDrill):
         print "Can't add to drill rack 'none'."
-    def addSymbolic(self, aName, aDrill):
+    def add_symbolic(self, aName, aDrill):
         print "Can't add to drill rack 'none'."
 
 #
@@ -659,11 +659,11 @@ class Primitive(FPCoreObj):
 
 class Pad(FPCoreObj):
     "Pads are sub-prititives of the PinGeometry sub-primitive."
-    def __init__(self, clearance, maskRelief):
+    def __init__(self, clearance, mask_relief):
         self.clearance = clearance
-        self.maskRelief = maskRelief
+        self.mask_relief = mask_relief
     def reprvals(self):
-        return [self.clearance, self.maskRelief]
+        return [self.clearance, self.mask_relief]
     @property
     def clearance(self):
         return self._clearance
@@ -674,10 +674,10 @@ class Pad(FPCoreObj):
             raise ValueError('Clearance must be >= zero.')
         self._clearance = dv
     @property
-    def maskRelief(self):
+    def mask_relief(self):
         return self._relief
-    @maskRelief.setter
-    def maskRelief(self, v):
+    @mask_relief.setter
+    def mask_relief(self, v):
         dv = Dim(v)
         if dv < 0:
             # FIXME: What about tenting??? Maybe should allow
@@ -689,7 +689,7 @@ class Pad(FPCoreObj):
     def __eq__(self, other):
         return self.__class__ == other.__class__ \
                and self.clearance == other.clearance \
-               and self.maskRelief == other.maskRelief
+               and self.mask_relief == other.mask_relief
     def covers(self, other):
         "Returns True if self covers other pad."
         raise NotImplementedError('Abstract')
@@ -699,14 +699,14 @@ class Pad(FPCoreObj):
     def annulus(self, aDrill):
         "Return minimum copper width if drilled at (0,0) by aDrill."
         raise NotImplementedError('Abstract')
-    def validAnnulus(self, aDrill, rules):
+    def valid_annulus(self, aDrill, rules):
         "Pad size minus drill size must be >= minannulus."
         return self.annulus(aDrill) >= rules['minannulus']
         
 
 class RoundPad(Pad):
-    def __init__(self, diameter, clearance, maskRelief):
-        Pad.__init__(self, clearance, maskRelief)
+    def __init__(self, diameter, clearance, mask_relief):
+        Pad.__init__(self, clearance, mask_relief)
         self.dia = diameter
     @property
     def dia(self):
@@ -718,7 +718,7 @@ class RoundPad(Pad):
             raise ValueError ('Diameter must be > 0.')
         self._dia = dv        
     def reprvals(self):
-        return [self.dia, self.clearance, self.maskRelief]
+        return [self.dia, self.clearance, self.mask_relief]
     def __eq__(self, other):
         return super(RoundPad,self).__eq__(other) \
                and self.dia == other.dia
@@ -744,11 +744,11 @@ class RoundPad(Pad):
         return (self.dia - aDrill)/2.0
 
 class SquarePad(Pad):
-    def __init__(self, width, clearance, maskRelief):
-        Pad.__init__(self, clearance, maskRelief)
+    def __init__(self, width, clearance, mask_relief):
+        Pad.__init__(self, clearance, mask_relief)
         self.width = width
     def reprvals(self):
-        return [self.width, self.clearance, self.maskRelief]
+        return [self.width, self.clearance, self.mask_relief]
     @property
     def width(self):
         return self._width
@@ -785,28 +785,28 @@ class SquarePad(Pad):
         
 
 class RectPad(Pad):
-    def __init__(self, p1, p2, clearance, maskRelief):
-        Pad.__init__(self, clearance, maskRelief)
+    def __init__(self, p1, p2, clearance, mask_relief):
+        Pad.__init__(self, clearance, mask_relief)
         # FIXME: Should call Pt() constructors? or type check?
         if p1.spans_org(p2):
             self.ll,self.ur = p1.rectify(p2)
         else:
             raise ValueError('Pad must surround (0,0).')
     @classmethod
-    def fromLWO(cls, length, width, clearance, maskRelief, orientation = 'h'):
+    def fromLWO(cls, length, width, clearance, mask_relief, orientation = 'h'):
         "Construct from length, width, and orientation."
         l = Dim(length)
         w = Dim(width)
         if orientation not in 'hv':
             raise ValueError("Orientation must be 'h' or 'v'.")
         x,y = (l/2,w/2) if orientation == 'h' else (w/2,l/2)
-        return cls(Pt(-x,-y),Pt(x,y), clearance, maskRelief)
+        return cls(Pt(-x,-y),Pt(x,y), clearance, mask_relief)
     @classmethod
     def fromPad(cls, aPad):
         "Construct RectPad from a SquarePad."
         w = aPad.width
         p1,p2 = Pt(-w,-w),Pt(w,w)
-        return cls(p1, p2, aPad.clearance, aPad.maskRelief)
+        return cls(p1, p2, aPad.clearance, aPad.mask_relief)
     def stretch(self, amount,  direction): 
         "Stretch the pad in given direction."
         try:
@@ -826,7 +826,7 @@ class RectPad(Pad):
         else:
             raise ValueError('Stretch direction must be one of: x,+x,-x,y,+y,-y')
     def reprvals(self):
-        return [self.ll, self.ur , self.clearance, self.maskRelief]
+        return [self.ll, self.ur , self.clearance, self.mask_relief]
     def __eq__(self, other):
         return super(RectPad,self).__eq__(other) \
                and self.ll == other.ll \
@@ -851,8 +851,8 @@ class RectPad(Pad):
         
 
 class RoundedRectPad(RectPad):
-    def __init__(self, p1, p2, clearance, maskRelief, radius=None):
-        RectPad.__init__(self, p1, p2, clearance, maskRelief)
+    def __init__(self, p1, p2, clearance, mask_relief, radius=None):
+        RectPad.__init__(self, p1, p2, clearance, mask_relief)
         self.radius = radius
     # FIXME: needs constructor LWRO
     # FIXME: implement specialized extents(), covers(), annulus()
@@ -860,11 +860,11 @@ class RoundedRectPad(RectPad):
     def fromPad(cls, aPad):
         radius = aPad.dia/2.0
         p = Pt(radius, radius)
-        return cls(p,  -p,  aPad.clearance,  aPad.maskRelief, radius)
+        return cls(p,  -p,  aPad.clearance,  aPad.mask_relief, radius)
     @classmethod
     def fromRectPad(cls,  rectPad, radius=None):
         return cls(rectPad.ll, rectPad.ur, rectPad.clearance,
-                   rectPad.maskRelief, radius)
+                   rectPad.mask_relief, radius)
 ##    @classmethod
 ##    def stretch(cls, aPad, stretch):
 ##        "Constructor, make RoundedRectPad by stretching a RoundPad."
@@ -887,28 +887,28 @@ class RoundedRectPad(RectPad):
         
 class PinGeometry(FPCoreObj):
     "PinGeometry is a sub-primitive of the PinSpec primitive."
-    #FIXME: Be sure compPad==None and solderPad==Pad() works, otherwise
+    #FIXME: Be sure comp_pad==None and solder_pad==Pad() works, otherwise
     # won't be able to do double-sided edge connectors correctly.
-    def __init__(self, compPad, drill=None, solderPad=None, innerPad=None):
-        self.compPad = compPad
+    def __init__(self, comp_pad, drill=None, solder_pad=None, inner_pad=None):
+        self.comp_pad = comp_pad
         self.drill = drill
-        self.solderPad = solderPad
-        self.innerPad = innerPad
+        self.solder_pad = solder_pad
+        self.inner_pad = inner_pad
     @property
-    def compPad(self):
-        return self._compPad
-    @compPad.setter
-    def compPad(self, aPad):
+    def comp_pad(self):
+        return self._comp_pad
+    @comp_pad.setter
+    def comp_pad(self, aPad):
         aPad.mustbe(Pad)
         try:
-            if self._solderPad == '=':
+            if self._solder_pad == '=':
                 # Trap case where breaking symmetry.
-                self._solderPad = self._compPad
-            # FIXME: if setting compPad equal to solderPad, should
+                self._solder_pad = self._comp_pad
+            # FIXME: if setting comp_pad equal to solder_pad, should
             # check symmetry and set '=' if necessary.
         except AttributeError:
-            pass # _solderPad not yet set.
-        self._compPad = aPad
+            pass # _solder_pad not yet set.
+        self._comp_pad = aPad
     @property
     def drill(self):
         return self._drill
@@ -918,42 +918,43 @@ class PinGeometry(FPCoreObj):
             aDrill.mustbe(Dim)
         self._drill = aDrill
     @property
-    def solderPad(self):
-        return self._compPad if self._solderPad == '=' else self._solderPad
-    @solderPad.setter
-    def solderPad(self, aPad):
+    def solder_pad(self):
+        return self._comp_pad if (self._solder_pad is None or
+                                  self._solder_pad == '=') else self._solder_pad
+    @solder_pad.setter
+    def solder_pad(self, aPad):
         if not(aPad == None or aPad == '=' or isinstance(aPad,Pad)):
             raise ValueError("Solder pad must be None, '=', or Pad().")
-        #if aPad == None or aPad == self.compPad:
-        if aPad == self.compPad:
-            # Trap redundant solderPad value and force to symmetric.
-            self._solderPad = '='
+        #if aPad == None or aPad == self.comp_pad:
+        if aPad == self.comp_pad:
+            # Trap redundant solder_pad value and force to symmetric.
+            self._solder_pad = '='
         else:
-            self._solderPad = aPad
+            self._solder_pad = aPad
         if 'p' in debug:
-            print '_solderPad:',self._solderPad, self.solderPad
+            print '_solder_pad:',self._solder_pad, self.solder_pad
     @property
     def symmetric(self):
-        return self._solderPad == '=' or self._compPad == self._solderPad
+        return self._solder_pad == '=' or self._comp_pad == self._solder_pad
     @property
-    def innerPad(self):
-        return self._innerPad
-    @innerPad.setter
-    def innerPad(self, aPad):
+    def inner_pad(self):
+        return self._inner_pad
+    @inner_pad.setter
+    def inner_pad(self, aPad):
         if aPad != None: raise NotImplementedError('Inner pads not yet supported.')
-        self._innerPad = aPad
+        self._inner_pad = aPad
     def reprvals(self):
-        l = [self.compPad]
-        if self.drill != None or self.solderPad != None or self.innerPad != None:
+        l = [self.comp_pad]
+        if self.drill != None or self.solder_pad != None or self.inner_pad != None:
             l.append(self.drill)
-        if self.solderPad != None or self.innerPad != None:
-            l.append(self._solderPad)
-        if self.innerPad != None:
-            l.append(self.innerPad)
+        if self.solder_pad != None or self.inner_pad != None:
+            l.append(self._solder_pad)
+        if self.inner_pad != None:
+            l.append(self.inner_pad)
         return l
     def valid(self, rules):
-        if not self.compPad.validAnnulus(self.drill, rules): return False
-        if not (self.symmetric or self.compPad.validAnnulus(self.drill, rules)): return False
+        if not self.comp_pad.valid_annulus(self.drill, rules): return False
+        if not (self.symmetric or self.comp_pad.valid_annulus(self.drill, rules)): return False
         if self.drill < rules['mindrill']: return False        
 
 class PinInfo(Primitive):
@@ -962,13 +963,13 @@ class PinInfo(Primitive):
     pass
 
 class PinSpec(PinInfo):
-    def __init__(self, loc, pinNumber, pinGeometry, rotation = 0, pinName = None):
+    def __init__(self, loc, pin_number, pin_geometry, rotation = 0, pin_name = None):
         super(PinSpec, self).__init__(loc)
-        self.num = int(pinNumber)
-        self.geo = pinGeometry.mustbe(PinGeometry)
+        self.num = int(pin_number)
+        self.geo = pin_geometry.mustbe(PinGeometry)
         self.rot = rotation
-        if pinName is not None:
-            self._name = str(pinName)
+        if pin_name is not None:
+            self._name = str(pin_name)
     def reprvals(self):
         l = [self.loc, self.num, self.geo]
         try:
@@ -989,9 +990,9 @@ class PinSpec(PinInfo):
         self._name = str(v)
         
 class PinGang(PinInfo):
-    def __init__(self, gangMaskRelief, pinList):
-        self.relief = gangMaskRelief # Mask relief at the extents of extreme pads.
-        self.pins = pinList # List of PinSpec() instances.
+    def __init__(self, gang_mask_relief, pin_list):
+        self.relief = gang_mask_relief # Mask relief at the extents of extreme pads.
+        self.pins = pin_list # List of PinSpec() instances.
     def reprvals(self):
         return [self.relief, self.pins]
     @property
@@ -1045,19 +1046,19 @@ class ThermalSink(PinInfo):
         return drls
     
 class Silk(Primitive):
-    def __init__(self, loc, penWidth):
+    def __init__(self, loc, pen_width):
         super(Silk, self).__init__(loc)
-        self.penWidth = penWidth
+        self.pen_width = pen_width
     @property
-    def penWidth(self):
+    def pen_width(self):
         return self._pw
-    @penWidth.setter
-    def penWidth(self, v):
+    @pen_width.setter
+    def pen_width(self, v):
         self._pw = v.mustbe(Dim)
     
 class SilkText(Silk):
-    def __init__(self, loc, rotation, penWidth, text, size):
-        super(SilkText, self).__init__(loc, penWidth)
+    def __init__(self, loc, rotation, pen_width, text, size):
+        super(SilkText, self).__init__(loc, pen_width)
         self.rot = rotation
         self.text = str(text) if text != None else ''
         size.mustbe(Dim)
@@ -1066,7 +1067,7 @@ class SilkText(Silk):
         self.size = size 
     def reprvals(self):
         #return [self.x, self.y, self.rot, self._pw, self.text, self._sz]
-        return [self.loc, self.rot, self.penWidth, self.text, self.size]
+        return [self.loc, self.rot, self.pen_width, self.text, self.size]
 ##    @property
 ##    def size(self):
 ##        return rules[self._sz]
@@ -1079,21 +1080,21 @@ class RefDes(SilkText):
     pass
 
 class SilkLine(Silk):
-    def __init__(self, p1, p2, penWidth):
-        super(SilkLine, self).__init__(p1, penWidth)
+    def __init__(self, p1, p2, pen_width):
+        super(SilkLine, self).__init__(p1, pen_width)
         self.p2 = Pt(p2)
 
 class SilkArc(Silk):
     "Fixed radius arc."
-    def __init__(self, loc, radius, startAngle, arcAngle, penWidth):
-        super(SilkArc, self).__init__(loc, penWidth)
+    def __init__(self, loc, radius, start_angle, arc_angle, pen_width):
+        super(SilkArc, self).__init__(loc, pen_width)
         self.radius = radius.mustbe(Dim)
-        if startAngle < 0.0 or startAngle > 360.0:
+        if start_angle < 0.0 or start_angle > 360.0:
             raise ValueError('Angle must be in range 0..360')
-        self.start = startAngle
-        if arcAngle < 0.0 or arcAngle > 360.0:
+        self.start = start_angle
+        if arc_angle < 0.0 or arc_angle > 360.0:
             raise ValueError('Arc length must be between 0 and 360.')
-        self.arc = arcAngle
+        self.arc = arc_angle
 
 class KeepOut(Primitive):
     "Specification of keep-out areas."
@@ -1120,15 +1121,15 @@ class KWToken(FPCoreObj):
     def reprvals(self):
         return [self.type, self.value]
     @classmethod
-    def typeKW(cls, s, lexposIgnored):
+    def type_KW(cls, s, lexposIgnored):
 ##        if s in cls.keywords:
 ##            return cls(cls.keywords[s],s)
         return cls('KW',s)
     @classmethod
-    def typePunct(cls, s, lexposIgnored):
+    def type_punct(cls, s, lexposIgnored):
         return cls(s,s)
     @classmethod
-    def typeNum(cls, s, lexposIgnored):
+    def type_NUM(cls, s, lexposIgnored):
 ##        try:
 ##            v = float(s)
 ##            return cls('NUM',v)
@@ -1154,11 +1155,11 @@ class KWToken(FPCoreObj):
 ##            return cls('BAD',s)
 ##        return cls('DIM',d)
     @classmethod
-    def typeStr(cls, s, lexposIgnored):
+    def type_STR(cls, s, lexposIgnored):
         end = -1 if s[-1] in '"\'' else None
         return cls('STR',s[1:end])
     @classmethod
-    def typeBad(cls, s, lexposIgnored):
+    def type_BAD(cls, s, lexposIgnored):
         return cls('BAD',s)
     def __eq__(self, other):
         if other is None:
@@ -1171,17 +1172,17 @@ class KWParamLexer(tt.RegexTokenizer):
     spec = [
         # The order is critical!  First match encountered is always taken.
         # Floats need to come before integers or confusion reigns.
-        (r'[a-zA-Z][a-zA-Z0-9_]*', KWToken.typeKW), # Keyword/identifier, etc.
-        (r'[0-9]*[\.][0-9]+\s*(mm|mil|inch|in)?', KWToken.typeNum), # Float.
-        (r'[0-9]+\s*(mm|mil|inch|in)?', KWToken.typeNum), # Integer.
-        (r'#([0-9]+|[A-Z])', KWToken.typeNum), # A number/letter drill.
-        (r'".*"', KWToken.typeStr), # Quoted matter using "
-        (r"'.*'", KWToken.typeStr), # Quoted matter using '
-        (r'".*$', KWToken.typeStr), # Missing close " -- take it all :/
-        (r"'.*$", KWToken.typeStr), # Missing close ' -- take it all
+        (r'[a-zA-Z][a-zA-Z0-9_]*', KWToken.type_KW), # Keyword/identifier, etc.
+        (r'[0-9]*[\.][0-9]+\s*(mm|mil|inch|in)?', KWToken.type_NUM), # Float.
+        (r'[0-9]+\s*(mm|mil|inch|in)?', KWToken.type_NUM), # Integer.
+        (r'#([0-9]+|[A-Z])', KWToken.type_NUM), # A number/letter drill.
+        (r'".*"', KWToken.type_STR), # Quoted matter using "
+        (r"'.*'", KWToken.type_STR), # Quoted matter using '
+        (r'".*$', KWToken.type_STR), # Missing close " -- take it all :/
+        (r"'.*$", KWToken.type_STR), # Missing close ' -- take it all
         (r'\s*',None), # Ignore white space.
-        (r'[=,]', KWToken.typePunct), # Valid punctuation
-        (r'.',KWToken.typeBad), # Catch-all
+        (r'[=,]', KWToken.type_punct), # Valid punctuation
+        (r'.',KWToken.type_BAD), # Catch-all
     ]
 
 class ArgObject(FPCoreObj):
@@ -1238,10 +1239,10 @@ class Footprint(FPCoreObj):
     def reprvals(self):
         return [self.refdes, self.pins, self.silk, self.comments]
     @classmethod
-    def parse(cls, footprintname, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warning_callback):
         raise NotImplementedError('Abstract')
     @classmethod
-    def parseKwargs(cls, params, kwspec = {}):
+    def parse_kwargs(cls, params, kwspec = {}):
         "Standarized parser for plug-in parameters."
         par = LinesOf(params)
         plist = []
@@ -1277,32 +1278,32 @@ class Footprint(FPCoreObj):
                         break
             plist.append((kw,vlist))
         #print 'plist:',plist
-        kwdict = dict(plist)
-        #print 'kwdict:',kwdict
+        kw_dict = dict(plist)
+        #print 'kw_dict:',kw_dict
         # Now validate the params against kwspec.
         requiredKw = [kw for kw in kwspec if kwspec[kw].req]
         for kw in requiredKw:
             try:
-                kwdict[kw]
+                kw_dict[kw]
             except KeyError:
                 raise RequiredKWError(kw)
-        for kw in kwdict:
+        for kw in kw_dict:
             try:
                 kwspec[kw]
             except KeyError:
                 raise InvalidKWError(kw)
         # Normalize floats to expected units.
-        for kw in kwdict:
-            kwdict[kw] = cls._normTokenVals(kwdict[kw],kwspec[kw].units)
+        for kw in kw_dict:
+            kw_dict[kw] = cls._norm_token_vals(kw_dict[kw],kwspec[kw].units)
         # Eliminate redundant value lists.
-        for kw in kwdict:
+        for kw in kw_dict:
             if not kwspec[kw].vlist:
-                v = kwdict[kw]
-                kwdict[kw] = v[0] if len(v) else None
-        #print 'Final kwdict:', kwdict
-        return kwdict
+                v = kw_dict[kw]
+                kw_dict[kw] = v[0] if len(v) else None
+        #print 'Final kw_dict:', kw_dict
+        return kw_dict
     @classmethod
-    def _normTokenVals(cls, value_list, default_units):
+    def _norm_token_vals(cls, value_list, default_units):
         # If anything has units, and they all match, use that
         # instead of default.
         #print repr(value_list),default_units
@@ -1332,7 +1333,7 @@ class Footprint(FPCoreObj):
                 setattr(a, name, None)
         return a        
     @classmethod
-    def standardComments(cls, pluginName, kwDict, rules, ruleList):
+    def standard_comments(cls, plugin_name, kw_dict, rules, rule_list):
         "Append a standard set of comments."
         l = []
         l.append('Generated by landmaker ' + str(dt.date.today()))
@@ -1346,11 +1347,11 @@ class Footprint(FPCoreObj):
             l.append(t)
         except RuleNotFound:
             pass
-        l.append('Plugin: ' + pluginName)
+        l.append('Plugin: ' + plugin_name)
         l.append('Parameters: ')
-        for kw in kwDict:
+        for kw in kw_dict:
             #units,reqd,isList = kwSpecs[kw]
-            v = kwDict[kw]
+            v = kw_dict[kw]
             vList = v if isinstance(v,list) else [v]
             dispList = []
             for val in vList:
@@ -1358,7 +1359,7 @@ class Footprint(FPCoreObj):
             disp = ', '.join(dispList)
             l.append('  {0:s}={1:s}'.format(kw, disp))
         l.append('rules:')
-        for r in ruleList:
+        for r in rule_list:
             l.append('  {0:s} = {1:s}'.format(r, str(rules[r])))
         return l
     @classmethod
@@ -1366,7 +1367,7 @@ class Footprint(FPCoreObj):
         nm = cls.__name__.split('_')[-1]
         yield "No help for " + nm
     @classmethod
-    def pluginName(cls):
+    def plugin_name(cls):
         return cls.__name__.split('_')[2]
     @classmethod
     def pin_num_generator(cls, start_num, pin_num_step=1):
@@ -1430,7 +1431,7 @@ class Footprint(FPCoreObj):
         pins.extend([cls.pinSpec(loc, n, right_geo)
                      for n, loc in right_pin_locs])
         return pins
-    def rendering(self, warningCallback):
+    def rendering(self, warning_callback):
         raise NotImplementedError('Abstract')
 
 # FIXME: Document standard rule names.

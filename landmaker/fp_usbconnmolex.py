@@ -33,13 +33,13 @@ class FP_usbconnmolex(fc.Footprint):
         yield "    54819-0519"
         yield "    <others tbw>"
     @classmethod
-    def parse(cls, footprintname, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warning_callback):
         # Call the standard parameter parser.
         kwspecs = {
             'type':     fc.KWSpec(None, True, False),
             'metric':   fc.KWSpec(None, False, False),
         }
-        kw = cls.parseKwargs(params, kwspecs)
+        kw = cls.parse_kwargs(params, kwspecs)
         # Pick up general rules
         maskrelief = rules['maskrelief']
         clearanceRule = rules['minspace']
@@ -53,13 +53,13 @@ class FP_usbconnmolex(fc.Footprint):
             ioPadDia = fc.Dim.MM(1.05)
             ioTopPad = cls.roundPad(ioPadDia, clearance, maskrelief)
             rackDrill =  rack[exactDrill]
-            if not ioTopPad.validAnnulus(rackDrill, rules):
-                warningCallback('Rack drill too large.')
+            if not ioTopPad.valid_annulus(rackDrill, rules):
+                warning_callback('Rack drill too large.')
                 if 'metric' in kw:
-                    warningCallback('Using ' + str(exactDrill))
+                    warning_callback('Using ' + str(exactDrill))
                     ioDrill = exactDrill
                 else:
-                    warningCallback('Using #70.')
+                    warning_callback('Using #70.')
                     ioDrill = fc.Dim.DRILL('#70')
             else:
                 ioDrill = rackDrill
@@ -107,7 +107,7 @@ class FP_usbconnmolex(fc.Footprint):
         else:
             raise fc.ParamSyntax(str(kw['type']).join(["Unkown type: ","'"]))
         # Make comments
-        cmt = cls.standardComments(cls.pluginName(), kw, rules,
+        cmt = cls.standard_comments(cls.plugin_name(), kw, rules,
             ['maskrelief','minspace','minannulus','refdessize','minsilk'])
         cmt.append('Pins 6 & 7 are case.')
         # Create the refdes, description, and footprint instance.

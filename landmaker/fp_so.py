@@ -53,13 +53,13 @@ class FP_so(fc.Footprint):
         yield "  clearance=<dim> -- optional pad clearance."
         yield "  mask=<dim> -- optional mask relief."
     @classmethod
-    def parse(cls, footprintname, params, rules, rack, warningcallback):
-        kw = cls.parseKwargs(params, cls.kw_specs)
+    def parse(cls, footprintname, params, rules, rack, warning_callback):
+        kw = cls.parse_kwargs(params, cls.kw_specs)
         if kw['pins'] % 2:
             raise fc.ParamSyntax('Must have even number of pins.')
-        return cls.from_kwargs(footprintname, rules, rack, warningcallback, **kw)
+        return cls.from_kwargs(footprintname, rules, rack, warning_callback, **kw)
     @classmethod
-    def from_kwargs(cls, footprintname, rules, rack, warningcallback, **kw):
+    def from_kwargs(cls, footprintname, rules, rack, warning_callback, **kw):
         # Make pin pad.
         try:
             mask = kw['mask']
@@ -95,7 +95,7 @@ class FP_so(fc.Footprint):
             thermal_antimask = cls._thermal_rect('thermalexp',**kw)
             thermal_drills = cls._drill_field(thermal_cu[0],**kw)
             if not thermal_antimask:
-                warningcallback('No thermal anti-mask specified.')
+                warning_callback('No thermal anti-mask specified.')
             t = cls.thermalSink(fc.Pt.MM(0,0), thermal_cu, [thermal_antimask],
                                [],[], # nothing on solder side
                                 thermal_drills,
@@ -118,7 +118,7 @@ class FP_so(fc.Footprint):
         silk.append(cls.silkLine(ul,ur,silkwidth))
         silk.append(cls.silkArc(fc.Pt.x0y(silky),silkx/5.0,0,180,silkwidth))
         # Comments
-        cmt = cls.standardComments(cls.__name__.split('_')[2],
+        cmt = cls.standard_comments(cls.__name__.split('_')[2],
             kw, rules,
             ['maskrelief','minspace','minsilk','refdessize'])
         # refdes

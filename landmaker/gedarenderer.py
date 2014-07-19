@@ -50,14 +50,14 @@ class Geda_RoundPad(RenderPadBase, fc.RoundPad):
     def square(self):
         return False
     @property
-    def padRadius(self):
+    def pad_radius(self):
         return self.dia/2.0
     def tFlags(self, side = 'c'):
         assert side in 'cs'
         return 'onsolder' if side == 's' else ''
     def rendering(self, loc, num, name='', side='c'):
         yield self.smtPad(loc, loc, self.dia, self.clearance, \
-                          self.maskRelief*2.0+self.dia,
+                          self.mask_relief*2.0+self.dia,
                           name if name else str(num),
                           num, 
                           self.tFlags(side))
@@ -72,7 +72,7 @@ class Geda_SquarePad(fc.SquarePad):
     def rendering(self, loc, num, name='', side='c'):
         # FIXME: Round,Square can use same code.
         yield self.smtPad(loc, loc, self.width, self.clearance, \
-                          self.maskRelief*2.0+self.width,
+                          self.mask_relief*2.0+self.width,
                           name if name else str(num),
                           self.tFlags(side))
 
@@ -83,17 +83,17 @@ class RenderRect_Base(RenderPadBase):
         yd = self.ur.y - self.ll.y
         return min([xd, yd])
     @property
-    def padRadius(self):
+    def pad_radius(self):
         radius = self.width/2.0
         assert radius > 0.0
         return radius
     def rendering(self, loc, num, name='', side='c'):
-        radius = self.padRadius
+        radius = self.pad_radius
         radOffset = fc.Pt(radius,radius)
         p1 = (self.ll + radOffset) + loc
         p2 = (self.ur - radOffset) + loc
         yield self.smtPad(p1, p2, self.width, self.clearance, \
-                          self.maskRelief*2.0 + self.width,
+                          self.mask_relief*2.0 + self.width,
                           name if name else str(num),
                           num, 
                           self.tFlags(side))            
@@ -120,14 +120,14 @@ class Geda_PinGeometry(fc.PinGeometry):
         drilled = self.drill != None
         simple = drilled \
             and self.symmetric \
-            and (isinstance(self.compPad, fc.RoundPad) \
-                or isinstance(self.compPad, fc.SquarePad))
-        topOnly = not self.symmetric and self.solderPad == None
-        botOnly = not self.symmetric and self.compPad == None
+            and (isinstance(self.comp_pad, fc.RoundPad) \
+                or isinstance(self.comp_pad, fc.SquarePad))
+        topOnly = not self.symmetric and self.solder_pad == None
+        botOnly = not self.symmetric and self.comp_pad == None
         return PinClassifiers(drilled, simple, self.symmetric, topOnly, botOnly)
 
 class Geda_PinSpec(fc.PinSpec):
-    def rendering(self, warningCallback):
+    def rendering(self, warning_callback):
         # pcb's notion of pins/pads don't map well to landmaker logic.
         # Instead of delegating rendering to sub-primitives, delegation
         # stops here and this method walks the sub-primitive properties.
@@ -137,13 +137,13 @@ class Geda_PinSpec(fc.PinSpec):
             yield '# classifiers: ' + repr(cl)
         if cl.drilled and cl.simple and cl.symmetric:
             # These map directly to Pin[] elements.
-            p = self.geo.compPad
+            p = self.geo.comp_pad
             # FIXME: make RenderingPin classs to handle Pin[] cases.
             yield 'Pin[{x:d} {y:d} {dia:d} {clear:d} {mask:d} {drill:d} "{pname:s}" "{pnum:d}" "{tflags:s}"]'.format( \
                 x=self.loc.x.gu, y=-self.loc.y.gu,  # x,y relative to mark \
                 dia=p.dia.gu,  # pad diameter \
                 clear=(p.clearance * 2.0).gu,  # Cu clearance \
-                mask=(p.dia + 2.0*p.maskRelief).gu,  # Diameter of mask anti-pad \
+                mask=(p.dia + 2.0*p.mask_relief).gu,  # Diameter of mask anti-pad \
                 drill=self.geo.drill.gu,  # Drill diameter \
                 pname=self.name,  # pin name \
                 pnum=self.num,  # pin number \
@@ -152,7 +152,7 @@ class Geda_PinSpec(fc.PinSpec):
             # These map directly to ordinary Pad[] elements.
             if 'r' in fc.debug:
                 yield '# <render a normal SMT pad>'
-            for ln in self.geo.compPad.rendering(self.loc, self.num, self.name):
+            for ln in self.geo.comp_pad.rendering(self.loc, self.num, self.name):
                 yield ln
         elif cl.drilled and not cl.simple:
             # These require obscure jiggery-pokery in pcb.
@@ -160,7 +160,7 @@ class Geda_PinSpec(fc.PinSpec):
             # First, compute a pcb Pin[] element to hold the drill info,
             # and select a pad diameter that is <= either top or
             # bottom extents.
-            radius = min([self.geo.solderPad.padRadius, self.geo.compPad.padRadius])
+            radius = min([self.geo.solder_pad.pad_radius, self.geo.comp_pad.pad_radius])
             yield 'Pin[{0:d} {1:d} {2:d} {3:d} {4:d} {5:d} "{6:s}" "{7:d}" "{8:s}"]'.format( \
                 self.loc.x.gu, -self.loc.y.gu,  # x,y relative to mark \
                 (2.0*radius).gu, # pad diameter \
@@ -171,9 +171,9 @@ class Geda_PinSpec(fc.PinSpec):
                 self.num,  # pin number \
                 '')  # no flags
             # Now put down the pads on each side of the board.
-            for ln in self.geo.compPad.rendering(self.loc, self.num, self.name):
+            for ln in self.geo.comp_pad.rendering(self.loc, self.num, self.name):
                 yield ln
-            for ln in self.geo.solderPad.rendering(self.loc, self.num, self.name,'s'):
+            for ln in self.geo.solder_pad.rendering(self.loc, self.num, self.name,'s'):
                 yield ln
         elif not cl.drilled and not (cl.topOnly or cl.botOnly):
             # This is most likely an edge connector.
@@ -183,7 +183,7 @@ class Geda_PinSpec(fc.PinSpec):
 
 class Geda_ThermalSink(fc.ThermalSink):
     _not_rectangle = 'Can only render rectanglular thermal pads for now.'
-    def rendering(self, warningCallback):
+    def rendering(self, warning_callback):
         # FIXME: add the clearance property correctly.
         self.clearance = fc.Dim.MIL(8)
         yield '# <render thermal sink here>'
@@ -256,26 +256,26 @@ class Geda_ThermalSink(fc.ThermalSink):
         return (c1+offset, c2-offset, width)
                     
 class Geda_PinGang(fc.PinGang):
-    def rendering(self, warningCallback):
+    def rendering(self, warning_callback):
         yield '# <render ganged pins here>'
         
 class Geda_SilkText(fc.SilkText):
-    def rendering(self, warningCallback):
+    def rendering(self, warning_callback):
         msg = 'Arbitrarily placed SilkText not supported by pcb. (0:%s)'.format(self.text)
-        warningCallback(msg)
+        warning_callback(msg)
         yield '# ' + msg
 
 class Geda_SilkLine(fc.SilkLine):
-    def rendering(self, warningCallback):
+    def rendering(self, warning_callback):
         # landmaker SilkLine maps directly to ElementLine[] element.
         s = 'ElementLine['
-        params = [self.loc.x, -self.loc.y, self.p2.x, -self.p2.y, self.penWidth]
+        params = [self.loc.x, -self.loc.y, self.p2.x, -self.p2.y, self.pen_width]
         s += ' '.join([str(param.gu) for param in params])
         s += ']'
         yield s
 
 class Geda_SilkArc(fc.SilkArc):
-    def rendering(self, warningCallback):
+    def rendering(self, warning_callback):
         # landmaker SilkArc maps directly to ElementArc[] element.
         # Truth be told, pcb's ElementArc[] allows the specification of
         # eliptical arcs (and landmaker does not). HOWEVER: pcb can't
@@ -287,7 +287,7 @@ class Geda_SilkArc(fc.SilkArc):
 
 
 class Geda_KeepOutRect(fc.KeepOutRect):
-    def rendering(self, warningCallback):
+    def rendering(self, warning_callback):
         yield '# Keep Out'
         # pcb does not directly support keep-outs.
         # Construct some silk lines and render the keep-out area that way.'
@@ -307,7 +307,7 @@ class Geda_KeepOutRect(fc.KeepOutRect):
         s.append(Geda_SilkLine(ul,lr,pen))
         # render the silk
         for silk in s:
-            for ln in silk.rendering(warningCallback):
+            for ln in silk.rendering(warning_callback):
                 yield ln
 
 # Define footprint-level gEDA renderer.
@@ -325,7 +325,7 @@ class Geda_Footprint(object):
     keepOutRect = Geda_KeepOutRect
     thermalSink = Geda_ThermalSink
     _indent = '    '
-    def rendering(self, warningCallback):
+    def rendering(self, warning_callback):
         # Construct the Element[...] line.
         sflags = ''
         # Initial placement location -- 10 mils from corner for now.
@@ -349,14 +349,14 @@ class Geda_Footprint(object):
         for ln in self.comments:
             yield '# '.join([self._indent, ln])
         for pin in self.pins:
-            for ln in pin.rendering(warningCallback):
+            for ln in pin.rendering(warning_callback):
                 yield self._indent + ln
         for art in self.silk:
-            for ln in art.rendering(warningCallback):
+            for ln in art.rendering(warning_callback):
                 yield self._indent + ln
         # Render keep-outs
         for ko in self.keepOuts:
-            for ln in ko.rendering(warningCallback):
+            for ln in ko.rendering(warning_callback):
                 yield self._indent + ln
         # All done!
         yield ')'

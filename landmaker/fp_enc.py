@@ -30,13 +30,13 @@ class FP_enc(fc.Footprint):
         yield "    RE130F"
         yield "    <others tbw>"
     @classmethod
-    def parse(cls, footprintname, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warning_callback):
         # Call the standard parameter parser.
         kwspecs = {
             'type':     fc.KWSpec(None, True, False),
             'ann':      fc.KWSpec('mil', False, False),
         }
-        kw = cls.parseKwargs(params, kwspecs)
+        kw = cls.parse_kwargs(params, kwspecs)
         # Pick up general rules
         maskrelief = rules['maskrelief']
         clearance = rules['minspace']
@@ -100,7 +100,7 @@ class FP_enc(fc.Footprint):
         else:
             raise fc.ParamSyntax(str(kw['type']).join(["Unkown type: ","'"]))
         # Make comments
-        cmt = cls.standardComments(cls.pluginName(), kw, rules,
+        cmt = cls.standard_comments(cls.plugin_name(), kw, rules,
             ['maskrelief','minspace','annulus_hs','refdessize'])
         cmt.append('Pins 6 & 7 are case.')
         # Create the refdes, description, and footprint instance.

@@ -43,7 +43,7 @@ class FP_th2pad(fc.Footprint):
         yield "  calculated, or can be specified in artlen."
         yield "  Rules referenced: maskrelief, minspace, silkwidth, refdessize."
     @classmethod
-    def parse(cls, footprintname, params, rules, rack, warningCallback):
+    def parse(cls, footprintname, params, rules, rack, warning_callback):
         # Call the standard parameter parser.
         kwspecs = {
             'desc':     fc.KWSpec(None, True, False),
@@ -54,7 +54,7 @@ class FP_th2pad(fc.Footprint):
             'artwidth': fc.KWSpec('mil', False, False),
             'artlen' :  fc.KWSpec('mil', False, False),
         }
-        kw = cls.parseKwargs(params, kwspecs)
+        kw = cls.parse_kwargs(params, kwspecs)
         # Compute sizes.
         drill = rack[kw['drill']]
         if 'dia' in kw:
@@ -95,7 +95,7 @@ class FP_th2pad(fc.Footprint):
         silky = awhalf+20
         rd = cls.refDes(fc.Pt(silky.u0,silky),0, rules['minsilk'], '', rules['refdessize'])
         # Make comments
-        cmt = cls.standardComments('th2pad', kw, rules, 
+        cmt = cls.standard_comments('th2pad', kw, rules, 
             ['maskrelief','minspace','minsilk','refdessize'])
         # Create the footprint instance.
         desc = str(kw['desc'])
