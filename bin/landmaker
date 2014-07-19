@@ -48,11 +48,25 @@ Optional rc file is first found of: ./landmaker.rc, ~/.landmaker/landmaker.rc"""
     args.debug = '' if args.debug == None else args.debug[0]
     return args
 
+def get_readline_history(name):
+    p = os.path.expanduser('~/.landmaker')
+    if os.path.isdir(p):
+        fname = '/'.join([p,name])
+        if os.path.exists(fname):
+            readline.read_history_file(fname)
+
+def put_readline_history(name):
+    p = os.path.expanduser('~/.landmaker')
+    if os.path.isdir(p):
+        fname = '/'.join([p,name])
+        readline.write_history_file(fname)
+
 def interactive():
     "Enter interactive shell mode."
-    commands = cmd.verbs.keys()
+    HISTORY = 'historyfile'
     def completer(text, state):
-        options = [i for i in commands if i.startswith(text)]
+        options = [i for i in cmd.completer_words()
+                   if i.startswith(text) or not len(text)]
         if state < len(options):
             return options[state]
         else:
@@ -60,6 +74,7 @@ def interactive():
 
     readline.parse_and_bind("tab: complete")
     readline.set_completer(completer)
+    get_readline_history(HISTORY)
 
     while True:
         try:
@@ -72,6 +87,7 @@ def interactive():
             print e.args[0]
         except StopIteration:
             break
+    put_readline_history(HISTORY)
         
 def batch(fileName, warningCallback):
     # Don't trap exceptions, let them halt program.

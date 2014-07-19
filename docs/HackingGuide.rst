@@ -80,9 +80,15 @@ which is a constructor for FP_<name> that interprets a single
 string and returns a complete, valid, ready to render  instance of FP_<name>.  
 The usual approach is to parse the parameter string into keyword
 arguments and then simply return the result of ``from_kwargs()``.
+
 The Footprint class defines a generic parameter parsing method as a
 convenience function that FP_<name> may use, or it can parse
 the string itself however it wants.
+If the plugin uses the generic parameter parser, it *should* make
+``kwspecs`` a class variable, which allows the readline command
+completer to pick up the plug-in's interactive keywords.
+Note that there is no requirement that interactive keywords
+be the same as the from_kwargs keyword arguments.
 
 The footprint *must* be composed only of primitives defined
 in footprintcore.py.

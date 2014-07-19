@@ -18,6 +18,7 @@
 
 import os
 import re
+import readline
 
 debug = ''
 
@@ -237,7 +238,7 @@ class Cmd_rule(Command):
         yield "rule <rule name>  = <value>"
         if longhelp:
             yield "  Set <rule name> to <value> in current rule set."
-
+    
 class Cmd_fp(Command):
     "Dipatch to footprint plug-in."
     def execute(self, s, warning_callback):
@@ -274,7 +275,8 @@ class Cmd_fp(Command):
         except KeyError:
             raise CommandSyntaxError(plugin.join(['Plugin ',' not found.']))
         try:
-            footprint = pu.parse(footprintname, puParams, rules, rack, warning_callback)
+            footprint = pu.parse(footprintname, puParams, rules, rack,
+                                 warning_callback)
         except FootprintException as e:
             print e.msg
             return None
@@ -327,11 +329,28 @@ def dispatchCommand(s, warningSink=nullWarningSink):
     except KeyError:
         raise CommandSyntaxError(t[0].join(["'","' not a command."]))
     verb.execute(params, warningSink)
-    
+
+def completer_words():
+    buff = readline.get_line_buffer()
+    kw = buff.split(' ')
+    cmd = kw[0].strip()
+    if cmd == 'fp':
+        try:
+            fp = kw[2].strip()
+        except IndexError:
+            return verbs['fp'].plugins.keys()
+        try:
+            params = verbs['fp'].plugins[fp].kwspecs.keys()
+        except KeyError:
+            return verbs['fp'].plugins.keys()
+        else:
+            return params
+    return _cmd_completer_words
 
 # Use introspection to load the command dictionary.
 verbs = collectVerbs(globals())
-
+_cmd_completer_words = verbs.keys()
+       
 
 #####################
 ##def init(plugins):
