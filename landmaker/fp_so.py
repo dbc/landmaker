@@ -22,7 +22,7 @@
 import footprintcore as fc
 
 class FP_so(fc.Footprint):
-    kw_specs = {
+    kwspecs = {
         'pins'       : fc.KWSpec(None, True, False),
         'padlen'     : fc.KWSpec('mm', True, False),
         'padwidth'   : fc.KWSpec('mm', True, False),
@@ -54,7 +54,7 @@ class FP_so(fc.Footprint):
         yield "  mask=<dim> -- optional mask relief."
     @classmethod
     def parse(cls, footprintname, params, rules, rack, warning_callback):
-        kw = cls.parse_kwargs(params, cls.kw_specs)
+        kw = cls.parse_kwargs(params, cls.kwspecs)
         if kw['pins'] % 2:
             raise fc.ParamSyntax('Must have even number of pins.')
         return cls.from_kwargs(footprintname, rules, rack, warning_callback, **kw)

@@ -19,6 +19,15 @@
 import footprintcore as fc
 
 class FP_th2pad(fc.Footprint):
+    kwspecs = {
+        'desc':     fc.KWSpec(None, True, False),
+        'spacing':  fc.KWSpec('mil', True, False),
+        'drill':    fc.KWSpec('inch', True, False),
+        'dia' :     fc.KWSpec('mil', False, False),
+        'annulus': fc.KWSpec('mil', False, False),
+        'artwidth': fc.KWSpec('mil', False, False),
+        'artlen' :  fc.KWSpec('mil', False, False),
+    }
     @classmethod
     def helptext(cls):
         yield "Through-hole, two-pad components."
@@ -45,16 +54,7 @@ class FP_th2pad(fc.Footprint):
     @classmethod
     def parse(cls, footprintname, params, rules, rack, warning_callback):
         # Call the standard parameter parser.
-        kwspecs = {
-            'desc':     fc.KWSpec(None, True, False),
-            'spacing':  fc.KWSpec('mil', True, False),
-            'drill':    fc.KWSpec('inch', True, False),
-            'dia' :     fc.KWSpec('mil', False, False),
-            'annulus': fc.KWSpec('mil', False, False),
-            'artwidth': fc.KWSpec('mil', False, False),
-            'artlen' :  fc.KWSpec('mil', False, False),
-        }
-        kw = cls.parse_kwargs(params, kwspecs)
+        kw = cls.parse_kwargs(params, cls.kwspecs)
         # Compute sizes.
         drill = rack[kw['drill']]
         if 'dia' in kw:

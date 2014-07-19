@@ -22,6 +22,10 @@
 import footprintcore as fc
 
 class FP_enc(fc.Footprint):
+    kwspecs = {
+        'type':     fc.KWSpec(None, True, False),
+        'ann':      fc.KWSpec('mil', False, False),
+    }
     @classmethod
     def helptext(cls):
         yield "Alpha encoders."
@@ -32,11 +36,7 @@ class FP_enc(fc.Footprint):
     @classmethod
     def parse(cls, footprintname, params, rules, rack, warning_callback):
         # Call the standard parameter parser.
-        kwspecs = {
-            'type':     fc.KWSpec(None, True, False),
-            'ann':      fc.KWSpec('mil', False, False),
-        }
-        kw = cls.parse_kwargs(params, kwspecs)
+        kw = cls.parse_kwargs(params, cls.kwspecs)
         # Pick up general rules
         maskrelief = rules['maskrelief']
         clearance = rules['minspace']

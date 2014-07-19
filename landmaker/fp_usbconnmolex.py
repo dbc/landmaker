@@ -25,6 +25,10 @@
 import footprintcore as fc
 
 class FP_usbconnmolex(fc.Footprint):
+    kwspecs = {
+        'type':     fc.KWSpec(None, True, False),
+        'metric':   fc.KWSpec(None, False, False),
+    }
     @classmethod
     def helptext(cls):
         yield "Molex USB connectors."
@@ -35,11 +39,7 @@ class FP_usbconnmolex(fc.Footprint):
     @classmethod
     def parse(cls, footprintname, params, rules, rack, warning_callback):
         # Call the standard parameter parser.
-        kwspecs = {
-            'type':     fc.KWSpec(None, True, False),
-            'metric':   fc.KWSpec(None, False, False),
-        }
-        kw = cls.parse_kwargs(params, kwspecs)
+        kw = cls.parse_kwargs(params, cls.kwspecs)
         # Pick up general rules
         maskrelief = rules['maskrelief']
         clearanceRule = rules['minspace']
