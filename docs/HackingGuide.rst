@@ -20,6 +20,84 @@ Modules
 - landmaker/gedascripting.py -- Python scripting interface for gEAD/PCB.
 - landmaker/kicadscripting.py -- Python scripting interface for Kicad.
 
+The Footprint Model
+-------------------
+
+Class Footprint
+...............
+
+``Footprint`` has properties for footprint-level features, and a 
+list of ``PinDef`` instances for pin-level features.
+
+Footprint-level features:
+
+- refdes (reference designator)
+- silk screen art
+- copper keep-out area definitions
+- clearance areas not modeled in pin definitions.
+
+The difference between a copper keep-out and footprint-level clearance 
+is that no copper is allowed in a keep-out, but connecting traces
+consistent with the netlist connectivity are allowed in clearance.
+
+Class PinDef
+............
+
+Assigns pin number, pin name, and x/y tranlation and rotation
+to a ``PinGeometry`` instance.
+
+Class PinGeometry
+.................
+
+``PinGeometry`` has three important subclasses:
+
+- ThroughPin
+- SMTPad
+- ThermalPolygon
+
+A ``PinGeometry`` instance contains one or more 
+instances of ``Land``, and specifies
+associated mask and paste layer features.
+Note that in the case of an SMTPad that is part of a gang mask,
+there is an N:1 mapping from PinGeometry instances onto an
+instance of Mask, and in the case of ThermalPolygon, there is
+a 1:M mapping from PinGeometry onto Mask definitions.
+Also, in case of ThermalPolygon, there is a 1:P mapping from
+PinGeometry onto Paste definitions.
+
+Class Land
+..........
+
+``Land`` references a shape instance that defines the copper
+for a pin landing, and specifies a clearance distance.
+
+ShapeInstance
+.............
+
+``ShapeInstance`` references a shape, and provides an offset and
+rotation at which the shape is rendered in the containing
+reference plane.
+
+Shape
+.....
+
+A ``Shape`` has subclasses:
+
+- ``AtomicShape`` 
+- ``ShapeInstanceList``
+
+The recursive definition via ``ShapeInstnace`` allows the
+construction of complex shapes for pads, mask apertures, etc.
+An ``AtomicShape`` maps directly to an RS-274X aperture
+macro.  The centroid of the ``AtomicShape`` is the reference
+point for translations and rotations applied by
+``ShapeInstance`` references.
+
+Other Classes
+.............
+
+to be written.
+
 Coding Conventions
 ------------------
 
