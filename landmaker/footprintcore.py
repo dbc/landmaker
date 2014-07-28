@@ -892,7 +892,8 @@ class PinGeometry(FPCoreObj):
     def __init__(self, comp_pad, drill=None, solder_pad=None, inner_pad=None):
         self.comp_pad = comp_pad
         self.drill = drill
-        self.solder_pad = solder_pad
+        self.solder_pad = solder_pad if solder_pad is not None else (None
+            if drill is None else '=')
         self.inner_pad = inner_pad
     @property
     def comp_pad(self):
@@ -919,11 +920,12 @@ class PinGeometry(FPCoreObj):
         self._drill = aDrill
     @property
     def solder_pad(self):
-        return self._comp_pad if (self._solder_pad is None or
-                                  self._solder_pad == '=') else self._solder_pad
+##        return self._comp_pad if (self._solder_pad is None or
+##                                  self._solder_pad == '=') else self._solder_pad
+        return self._comp_pad if self._solder_pad == '=' else self._solder_pad
     @solder_pad.setter
     def solder_pad(self, aPad):
-        if not(aPad == None or aPad == '=' or isinstance(aPad,Pad)):
+        if not(aPad is None or aPad == '=' or isinstance(aPad,Pad)):
             raise ValueError("Solder pad must be None, '=', or Pad().")
         #if aPad == None or aPad == self.comp_pad:
         if aPad == self.comp_pad:
@@ -1380,7 +1382,7 @@ class Footprint(FPCoreObj):
     @classmethod   
     def pin_row(cls, p1, p2, num_pins, start_num, pin_num_step=1):
         "Returns list of (pin_num, location) tuples from seed values."
-        pitch = p2-p1
+        pitch = p1-p2
         pin_num = cls.pin_num_generator(start_num, pin_num_step)
         return [(next(pin_num),p1+pitch*i) for i in range(num_pins)]
     @classmethod

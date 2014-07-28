@@ -122,8 +122,10 @@ class Geda_PinGeometry(fc.PinGeometry):
             and self.symmetric \
             and (isinstance(self.comp_pad, fc.RoundPad) \
                 or isinstance(self.comp_pad, fc.SquarePad))
-        topOnly = not self.symmetric and self.solder_pad == None
-        botOnly = not self.symmetric and self.comp_pad == None
+        if 'c' in fc.debug:
+            print 'comp_pad:',repr(self.comp_pad),self.solder_pad is None
+        topOnly = (not self.symmetric) and (self.solder_pad is None)
+        botOnly = (not self.symmetric) and (self.comp_pad is None)
         return PinClassifiers(drilled, simple, self.symmetric, topOnly, botOnly)
 
 class Geda_PinSpec(fc.PinSpec):

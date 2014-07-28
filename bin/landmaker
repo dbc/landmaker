@@ -177,6 +177,6 @@ elif args.script == None:
 else:
     # Run script and exit.
     if os.path.isfile(args.script):
-        batch(args.script)
+        batch(args.script, warningsToConsole)
     else:
         print args.script,'not found.'

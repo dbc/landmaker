@@ -55,8 +55,8 @@ class FP_enc(fc.Footprint):
             ioPad = cls.roundPad(ioPadDia, clearance, maskrelief)
             mntPad = cls.roundPad(mntPadDia, clearance, maskrelief)
             # Construct Pin geometries
-            ioGeo = cls.pinGeometry(ioPad, ioDrill)
-            mntGeo = cls.pinGeometry(mntPad, mntRackDrill)
+            ioGeo = cls.pinGeometry(ioPad, ioDrill,'=')
+            mntGeo = cls.pinGeometry(mntPad, mntRackDrill,'=')
             # Construct pin specs
             pinSpecs = []
             pinSpecs.append(cls.pinSpec(fc.Pt.MIL(-275, 100),1,ioGeo))

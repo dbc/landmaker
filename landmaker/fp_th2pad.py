@@ -67,7 +67,7 @@ class FP_th2pad(fc.Footprint):
         clearance = rules['minspace']
         # Build the pin geometry
         pad = cls.roundPad(diameter, clearance, maskrelief)
-        pg = cls.pinGeometry(pad, drill)
+        pg = cls.pinGeometry(pad, drill,'=')
         pg.valid(rules)
         # Make pins
         halfwidth = kw['spacing'] / 2.0

@@ -75,11 +75,13 @@ class FP_so(fc.Footprint):
         ll = - ur
         pad = cls.rectPad(ll, ur, clear, mask)
         pingeo = cls.pinGeometry(pad)
+        #print 'fp pingeo:',repr(pingeo)
         # Make pins.
         pinx = (kw['span']-padwidth)/2.0
         pitch = kw['pitch']
         numpins = int(kw['pins'])
         pins = cls.dil_geometry(numpins, kw['span']-padwidth, pitch, pingeo)
+        #print 'in fp_so, pins:',repr(pins)
 ##        t = [x+1 for x in range(0,numpins/2)]
 ##        y = ((numpins/2) - 1) * pitch/2.0
 ##        leftpins = [] 

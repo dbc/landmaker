@@ -5,6 +5,7 @@
 *.html
 *.fp
 *.fp-
+!/testsmanual/expects/*.fp
 *.pcb
 *.pcb-
 PCB.*.backup
