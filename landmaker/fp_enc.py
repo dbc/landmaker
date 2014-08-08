@@ -52,11 +52,6 @@ class FP_enc(fc.Footprint):
             if True:
                 # Someday there might be a parameter option w.r.t. drill
                 ioDrill = rackDrill
-##            ioPad = cls.roundPad(ioPadDia, clearance, maskrelief)
-##            mntPad = cls.roundPad(mntPadDia, clearance, maskrelief)
-##            # Construct Pin geometries
-##            ioGeo = cls.pinGeometry(ioPad, ioDrill,'=')
-##            mntGeo = cls.pinGeometry(mntPad, mntRackDrill,'=')
             # Construct Pin Geometries
             ioGeo = cls.thruPin.circle(ioDrill, clearance, ioPadDia, maskrelief)
             mntGeo = cls.thruPin.circle(mntRackDrill, clearance, mntPadDia, maskrelief)
@@ -84,20 +79,6 @@ class FP_enc(fc.Footprint):
             silk.append(cls.silkLine( silkCorner.reflox,  silkYLineEP.reflox, pw))
             silk.append(cls.silkLine( silkCorner.refloy,  silkXLineEP.refloy, pw))
             silk.append(cls.silkLine( silkCorner.refloy,  silkYLineEP.refloy, pw))
-            
-            
-##            silkx = fc.Dim.MIL(520)/2.0
-##            silky = fc.Dim.MIL(490)/2.0
-##            silkxgap = fc.Dim.MIL(70)
-##            silkygap = fc.Dim.MIL(150)
-##            silk.append(cls.silkLine( silkx,-silky, silkxgap,-silky, pw))
-##            silk.append(cls.silkLine(-silkx,-silky,-silkxgap,-silky, pw))
-##            silk.append(cls.silkLine( silkx, silky, silkxgap, silky, pw))
-##            silk.append(cls.silkLine(-silkx, silky,-silkxgap, silky, pw))
-##            silk.append(cls.silkLine(-silkx,-silky,-silkx,-silkygap, pw))
-##            silk.append(cls.silkLine(-silkx, silky,-silkx, silkygap, pw))
-##            silk.append(cls.silkLine( silkx,-silky, silkx,-silkygap, pw))
-##            silk.append(cls.silkLine( silkx, silky, silkx, silkygap, pw))
             # Keep-outs
             keepOuts = []
         else:

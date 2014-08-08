@@ -352,12 +352,6 @@ verbs = collectVerbs(globals())
 _cmd_completer_words = verbs.keys()
        
 
-#####################
-##def init(plugins):
-##    global fp_plugins
-##    fp_plugins = plugins
-
-
 #################33
 # Command core interp should also understand "here documents" for fp
 # commands, or have a form of fp that passes multiple lines to parse.

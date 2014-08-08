@@ -73,34 +73,22 @@ class FP_so(fc.Footprint):
         padwidth = kw['padwidth']
         ur = fc.Pt(padlen/2.0, padwidth/2.0)
         ll = - ur
-##        pad = cls.rectPad(ll, ur, clear, mask)
-##        pingeo = cls.pinGeometry(pad)
         pingeo = cls.smtPad.obround(clear, padlen, padwidth, mask)
-        #print 'fp pingeo:',repr(pingeo)
         # Make pins.
         pinx = (kw['span']-padwidth)/2.0
         pitch = kw['pitch']
         numpins = int(kw['pins'])
         pins = cls.dil_geometry(numpins, kw['span']-padwidth, pitch, pingeo)
-        #print 'in fp_so, pins:',repr(pins)
-##        t = [x+1 for x in range(0,numpins/2)]
-##        y = ((numpins/2) - 1) * pitch/2.0
-##        leftpins = [] 
-##        for pin in t:
-##            leftpins.append((pin, fc.Pt(-pinx, y)))
-##            y -= pitch
-##        rightpins = [((numpins-pin)+1, fc.Pt(pinx, loc.y)) for pin, loc in leftpins]
-##        leftpins.extend(rightpins)
-##        pins = [cls.pinSpec(loc, num, pingeo) for num, loc in leftpins]
         # Make thermal pad.
-##        thermal_cu = cls._thermal_rect('thermal',**kw)
-        thermal_cu = kw['thermal']
+        try:
+            thermal_cu = kw['thermal']
+        except:
+            thermal_cu = None
         if thermal_cu:
             print thermal_cu
             cu_x, cu_y = thermal_cu
             cu_ur = fc.Pt(cu_x/2.0, cu_y/2.0)
             cu_ll = -cu_ur
-            ##thermal_antimask = cls._thermal_rect('thermalexp',**kw)
             thermal_antimask = kw['thermalexp']
             if thermal_antimask:
                 mask_x, mask_y = thermal_antimask
@@ -124,17 +112,6 @@ class FP_so(fc.Footprint):
                 clear, cu_ll, cu_ur, mask_ll, mask_ur,
                 drill_size, drill_points)
             pins.append(cls.pinSpec(fc.Pt.MM(0,0), numpins+1, t, 0, 'THRM' ))
-            # WAS
-##            thermal_antimask = cls._thermal_rect('thermalexp',**kw)
-##            thermal_drills = cls._drill_field(thermal_cu[0],**kw)
-##            if not thermal_antimask:
-##                warning_callback('No thermal anti-mask specified.')
-##            t = cls.thermalSink(fc.Pt.MM(0,0), thermal_cu, [thermal_antimask],
-##                               [],[], # nothing on solder side
-##                                thermal_drills,
-##                                numpins+1,'THRM')
-           ## pins.append(t)
-            
         # Make silk -- be sure it doesn't run into thermal anti-mask.
         pkglen = kw['pkglen']
         silkwidth = rules['minsilk']
@@ -159,25 +136,6 @@ class FP_so(fc.Footprint):
         rd = cls.refDes(fc.Pt.MM(0,0),0,rules['minsilk'],'',rules['refdessize'])
         return cls(footprintname, '', rd, pins, silk, cmt)
     @classmethod
-    def _thermal_rect(cls, keyword, **kw):
-        try:
-            t = kw[keyword]
-        except KeyError:
-            return []
-        else:
-            try:
-                thermw, therml = t
-            except ValueError:
-                raise fc.ParamSyntax(
-                    'Expected width,length for thermal feature: ' + keyword)
-            else:
-                thermw,therml = (thermw,therml) if thermw < therml \
-                                else (therml, thermw)
-                x,y = thermw/2.0, therml/2.0
-                # Return lower-left as first point.
-                rect = [fc.Pt(a,b) for a,b in [(-x,-y),(-x,y),(x,y),(x,-y)]]
-                return rect
-    @classmethod
     def _drill_field(cls, lower_left, **kw):
         try:
             v = kw['vias']
@@ -195,8 +153,6 @@ class FP_so(fc.Footprint):
             raise fc.ParamSyntax('Expected width,length count for drill field.')
         nw,nl,stagger = int(nw),int(nl),bool(stagger)
         nw,nl = (nw,nl) if nw < nl else (nl,nw)
-##        thermw = min(kw['thermal'])
-##        therml = max(kw['thermal'])
         thermw,therml = kw['thermal']
         lenstep = fc.Pt.x0y(therml/nl)
         widthstep = fc.Pt.xy0(thermw/nw)

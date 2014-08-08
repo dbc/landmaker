@@ -50,34 +50,11 @@ class FP_usbconnmolex(fc.Footprint):
         if kw['type'] == '54819-0519':
             # Construct pads
             exactDrill = fc.Dim.MM(0.7)
-##            ioPadDia = fc.Dim.MM(1.05)
-##            ioTopPad = cls.roundPad(ioPadDia, clearance, maskrelief)
-            rackDrill =  rack[exactDrill]
-##            if not ioTopPad.valid_annulus(rackDrill, rules):
-##                warning_callback('Rack drill too large.')
-##                if 'metric' in kw:
-##                    warning_callback('Using ' + str(exactDrill))
-##                    ioDrill = exactDrill
-##                else:
-##                    warning_callback('Using #70.')
-##                    ioDrill = fc.Dim.DRILL('#70')
-##            else:
-##                ioDrill = rackDrill
-            
+            rackDrill =  rack[exactDrill]            
             ioDrill = fc.Dim.DRILL('#70')
             mountDrill = rack[fc.Dim.MM(1.9)]
-##            # Make bot I/O pads by stretching.
-##            stretch_by = fc.Dim.MM(1.65) - ioTopPad.dia
             ioPadDia = fc.Dim.MM(1.05)
             stretch_by = fc.Dim.MM(1.65) - ioPadDia
-##            ioBotPadL = cls.roundedRectPad.fromPad(ioTopPad)
-##            ioBotPadL.stretch(stretch_by,  '-x')
-##            ioBotPadR = cls.roundedRectPad.fromPad(ioTopPad)
-##            ioBotPadR.stretch(stretch_by,  '+x')
-####            stretchBy = fc.Dim.MM(1.65) - ioTopPad.dia
-####            ioBotPadL = cls.roundedRectPad.stretch(ioTopPad,-stretchBy, 0)
-####            ioBotPadR = cls.roundedRectPad.stretch(ioTopPad, stretchBy, 0)
-##            mountPad = cls.roundPad(fc.Dim.MM(2.7), clearanceRule, maskrelief)
             # Construct Pin geometries
             ioLGeo = cls.thruPin.obround_solder(ioDrill, clearance,
                 ioPadDia, maskrelief, xstretch= -stretch_by)
@@ -85,9 +62,6 @@ class FP_usbconnmolex(fc.Footprint):
                 ioPadDia, maskrelief, xstretch= stretch_by)
             mntGeo = cls.thruPin.circle(mountDrill, clearance, fc.Dim.MM(2.7),
                                   maskrelief)
-##            ioLGeo = cls.pinGeometry(ioTopPad, ioDrill, ioBotPadL)
-##            ioRGeo = cls.pinGeometry(ioTopPad, ioDrill, ioBotPadR)
-##            mntGeo = cls.pinGeometry(mountPad, mountDrill)
             # Construct pin specs
             pinLx = fc.Dim.MM(-1.2)
             pinLy = fc.Dim.MM(0.8)
@@ -100,16 +74,12 @@ class FP_usbconnmolex(fc.Footprint):
             pinSpecs.append(cls.pinSpec(fc.Pt(zero,-2*pinLy),5,ioRGeo))
             # Mounting pins become pins 6 & 7 for "hardware" connection.
             mntPt = fc.Pt.MM(-5.05, 7.3/2.0)
-##            mntX = fc.Dim.MM(-5.05)
-##            mntY = fc.Dim.MM(7.3/2.0)
             pinSpecs.append(cls.pinSpec(mntPt,6,mntGeo))                            
             pinSpecs.append(cls.pinSpec(mntPt.reflox,7,mntGeo))
             # Keep-outs
             keepOuts = []
             keepOuts.append(cls.keepOutRect(fc.Pt.MM(-1.8, 3), fc.Pt.MM( 0.7, 4.4)))
             keepOuts.append(cls.keepOutRect(fc.Pt.MM(-1.8, -4.4), fc.Pt.MM( 0.7, -3)))
-##            keepOuts.append(cls.keepOutRect(fc.Dim.MM(-6.8), fc.Dim.MM(3.1),\
-##                                            fc.Dim.MM(-5.6),-fc.Dim.MM(3.1)))
             keepOuts.append(cls.keepOutRect(fc.Pt.MM(-6.8, 3.0),\
                                             fc.Pt.MM(-6.4,-3.0)))
             keepOuts.append(cls.keepOutRect(fc.Pt.MM(-6.4, 2.2),\
