@@ -1,0 +1,34 @@
+Updated: 8-Aug-14
+=================
+____ clean up test failures caused by modeling re-work
+____ augment test base with directed tests for new functions.
+____ Gang mask in so plugin.
+     1. Warn when mask webbing fails minmask rule.
+     2. Compute a simple mask bloat that forms a gang.
+     3. Compute an optimal gang mask and add rendering kludge.
+____ Add slots to geda renderer by computing a covering
+     drill.
+     ____ update fp_usb to use slot primitive
+____ Write a new plug-in for headers
+____ Code review/clean-up of current plugins
+     ____ check for
+          ____ use of ArgObject
+          ____ validation of footprint against rule set
+     ____ fp_enc.py
+     ____ fp_hole.py
+     ____ fp_so.py
+     ____ fp_th2pad.py
+     ____ fp_usbconnmolex.py
+____ Complete PEP8-ification.
+____ bug list
+     ____ warnings/messages are over-suppressed for command line invocation
+____ implement silk arc rendering in gedarenderer
+____ shell auto-completers are incomplete
+____ rules dictionary
+     ____ rules dict class should check for completeness w.r.t. required rules
+     ____ define list of well-known rule names
+____ Add height/centroid for pick-and-place to footprint model.
+____ Add volume rendering (skyscraper info) to footprint model.
+____ Dim() arithmetic model breaks units analysis on mult/div
+____ define list of well-known symbolic drill names. 
+
