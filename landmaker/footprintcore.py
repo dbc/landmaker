@@ -37,7 +37,8 @@ def trace(name, globalVars, localVars=None):
         v = localVars[name]
     except (TypeError,KeyError):
         v = globalVars[name]
-    print '{0:s} = {1:s} ({info.filename}:{info.function}@{info.lineno})'.format(name, repr(v),info=info)
+    print '{0:s} = {1:s} ({info.filename}:{info.function}@{info.lineno})'.format(
+        name, repr(v),info=info)
 
 
 #
@@ -91,16 +92,15 @@ class InternalError(Exception):
 #
 class FPCoreObj(object):
     def __repr__(self):
-        s = self.__class__.__name__ + '('
-        s += ','.join([repr(x) for x in self.reprvals()])
-        s += ')'
-        return s
+        return ''.join([self.__class__.__name__,'(',
+            ','.join([repr(x) for x in self.reprvals()]),
+                 ')'])
     def reprvals(self):
         return []
-    def mustbe(self, aType, optional_message=None):
-        if isinstance(self, aType):
+    def mustbe(self, a_type, optional_message=None):
+        if isinstance(self, a_type):
             return self
-        wanted = aType.__name__
+        wanted = a_type.__name__
         got = self.__class__.__name__
         msg = (optional_message if optional_message else
                ''.join(['Expected: ',wanted,', but got: ',got]))
@@ -243,6 +243,8 @@ class Dim(FPCoreObj):
         "Return a zero with same units."
         # FIXME: add unit tests
         return self.__class__(0.0, self.du)
+    def minus_plus(self, other):
+        return self-other, self+other
     # Arithmetic operators can take two Dim() instances, or
     # one Dim() and one float()'able operand.  Display units are
     # taken from the left-hand operand in the case of two Dim()'s.
@@ -350,6 +352,21 @@ class Pt(FPCoreObj):
     @classmethod
     def x0y(cls, y):
         return cls(Dim.VU(0,y.du),y)
+    @classmethod
+    def point_row(cls, p0, p1, count):
+        pitch = p0 - p1
+        return [p0 + pitch*i for i in xrange(count)]
+    @classmethod
+    def point_array(cls, p0, p1, counts):
+        xcount, ycount = counts
+        xpitch, ypitch = p0 - Pt(p1.x,p0.y), p0 - Pt(p0.x,p1.y)
+        column_heads = cls.point_row(p0,p0+xpitch, xcount)
+        print 'column heads:',column_heads
+        t = []
+        for p in column_heads:
+            t.extend(cls.point_row(p, p+ypitch, ycount))
+            print 't',t
+        return t
     def order(self, other):
         return (self, other) if self <= other else (other, self)
     def rectify(self,  other):
@@ -646,7 +663,7 @@ class Primitive(FPCoreObj):
     def __init__(self, loc):
         self.loc = loc
     def reprvals(self):
-        return [self._loc]
+        return [self.loc]
     @property
     def loc(self):
         return self._loc
@@ -657,307 +674,752 @@ class Primitive(FPCoreObj):
             raise TypeError('Location must be a Pt().')
         self._loc = v
 
-class Pad(FPCoreObj):
-    "Pads are sub-prititives of the PinGeometry sub-primitive."
-    def __init__(self, clearance, mask_relief):
-        self.clearance = clearance
-        self.mask_relief = mask_relief
-    def reprvals(self):
-        return [self.clearance, self.mask_relief]
-    @property
-    def clearance(self):
-        return self._clearance
-    @clearance.setter
-    def clearance(self, v):
-        dv = Dim(v)
-        if dv < 0:
-            raise ValueError('Clearance must be >= zero.')
-        self._clearance = dv
-    @property
-    def mask_relief(self):
-        return self._relief
-    @mask_relief.setter
-    def mask_relief(self, v):
-        dv = Dim(v)
-        if dv < 0:
-            # FIXME: What about tenting??? Maybe should allow
-            # relief down to -dia/2 -- will need to delgate check to subclasses.
-            # or add a lower-limit property to subclass -- but have an __init__()
-            # order issue in that case.
-            raise ValueError('Mask relief must be >= zero.')
-        self._relief = dv
-    def __eq__(self, other):
-        return self.__class__ == other.__class__ \
-               and self.clearance == other.clearance \
-               and self.mask_relief == other.mask_relief
-    def covers(self, other):
-        "Returns True if self covers other pad."
-        raise NotImplementedError('Abstract')
-    def extents(self):
-        "Returns list of Pt()'s to be checked by cover()."
-        raise NotImplementedError('Abstract')
-    def annulus(self, aDrill):
-        "Return minimum copper width if drilled at (0,0) by aDrill."
-        raise NotImplementedError('Abstract')
-    def valid_annulus(self, aDrill, rules):
-        "Pad size minus drill size must be >= minannulus."
-        return self.annulus(aDrill) >= rules['minannulus']
-        
-
-class RoundPad(Pad):
-    def __init__(self, diameter, clearance, mask_relief):
-        Pad.__init__(self, clearance, mask_relief)
-        self.dia = diameter
-    @property
-    def dia(self):
-        return self._dia
-    @dia.setter
-    def dia(self, v):
-        dv = Dim(v)
-        if dv <= 0.0:
-            raise ValueError ('Diameter must be > 0.')
-        self._dia = dv        
-    def reprvals(self):
-        return [self.dia, self.clearance, self.mask_relief]
-    def __eq__(self, other):
-        return super(RoundPad,self).__eq__(other) \
-               and self.dia == other.dia
-    def extents(self):
-        # Aproximate the extents by 8 points around the circle.
-        w2 = self.dia/2.0
-        du = w2.du
-        l = [Pt(w2,Dim(0,du)), Pt(-w2, Dim(0,du)),
-             Pt(Dim(0,du), w2), Pt(Dim(0,du),-w2)]
-        r = w2 * 0.707
-        l.extend([Pt(r,r),Pt(r,-r),Pt(-r,r),Pt(-r,-r)])
-        return l
-    def covers(self, other):
-        if isinstance(other, RoundPad):
-            return self.dia >= other.dia
-        r = self.dia / 2.0
-        for p in other.extents():
-            if len(p) > r:
-                return False
-        return True
-    def annulus(self, aDrill):
-        "Return minimum copper width if drilled at (0,0) by aDrill."
-        return (self.dia - aDrill)/2.0
-
-class SquarePad(Pad):
-    def __init__(self, width, clearance, mask_relief):
-        Pad.__init__(self, clearance, mask_relief)
-        self.width = width
-    def reprvals(self):
-        return [self.width, self.clearance, self.mask_relief]
-    @property
-    def width(self):
-        return self._width
-    @width.setter
-    def width(self, v):
-        w = Dim(v)
-        if w < 0.0:
-            raise ValueError('Width must be > 0.')
-        self._width = w
-    @property
-    def dia(self):
-        # symnonym for width
-        return self.width
-    def __eq__(self, other):
-        return super(SquarePad,self).__eq__(other) \
-               and self.width == other.width
-    def extents(self):
-        w2 = self.width/2.0
-        return [Pt(-w2,-w2), Pt(w2,-w2), Pt(-w2, w2), Pt(w2,w2)]
-    def covers(self, other):
-        if isinstance(other, SquarePad):
-            return self.width >= other.width
-        if isinstance(other, RoundPad):
-            return self.width >= other.dia
-        w2 = self.width/2.0
-        ll,ur = Pt(-w2,-w2),Pt(w2,w2)
-        for p in other.extents():
-            if p.left_of(ll) or p.below(ll) or p.right_of(ur) or p.above(ur):
-                return False
-        return True
-    def annulus(self, aDrill):
-        "Return minimum copper width if drilled at (0,0) by aDrill."
-        return (self.width - aDrill)/2.0
-        
-
-class RectPad(Pad):
-    def __init__(self, p1, p2, clearance, mask_relief):
-        Pad.__init__(self, clearance, mask_relief)
-        # FIXME: Should call Pt() constructors? or type check?
-        if p1.spans_org(p2):
-            self.ll,self.ur = p1.rectify(p2)
-        else:
-            raise ValueError('Pad must surround (0,0).')
-    @classmethod
-    def fromLWO(cls, length, width, clearance, mask_relief, orientation = 'h'):
-        "Construct from length, width, and orientation."
-        l = Dim(length)
-        w = Dim(width)
-        if orientation not in 'hv':
-            raise ValueError("Orientation must be 'h' or 'v'.")
-        x,y = (l/2,w/2) if orientation == 'h' else (w/2,l/2)
-        return cls(Pt(-x,-y),Pt(x,y), clearance, mask_relief)
-    @classmethod
-    def fromPad(cls, aPad):
-        "Construct RectPad from a SquarePad."
-        w = aPad.width
-        p1,p2 = Pt(-w,-w),Pt(w,w)
-        return cls(p1, p2, aPad.clearance, aPad.mask_relief)
-    def stretch(self, amount,  direction): 
-        "Stretch the pad in given direction."
-        try:
-            amt = abs(Dim(amount) )
-        except ValueError:
-            # Hmmm... well... get a bigger hammer and try again.
-            amt = abs(Dim(float(amount), self.loc.du))
-        zero = amt.u0
-        if direction in ['x', '+x']:
-            self.ur += Pt(amt, zero)
-        elif direction == '-x':
-            self.ll -= Pt(amt, zero)
-        elif direction in ['y', '+y']:
-            self.ur += Pt(zero, amt)
-        elif direction == '-y':
-            self.ll -= Pt(zero, amt)
-        else:
-            raise ValueError('Stretch direction must be one of: x,+x,-x,y,+y,-y')
-    def reprvals(self):
-        return [self.ll, self.ur , self.clearance, self.mask_relief]
-    def __eq__(self, other):
-        return super(RectPad,self).__eq__(other) \
-               and self.ll == other.ll \
-               and self.ur == other.ur
-    def extents(self):
-        return [self.ll, self.ur,
-                pt(self.ll.x, self.ur.y), pt(self.ur.x, self.ll.y)]
-    def covers(self, other):
-        for p in other.extents():
-            if p.left_of(self.ll): return False
-            if p.below(self.ll): return False
-            if p.right_of(self.ur): return False
-            if p.above(self.ur): return False
-        return True
-    def annulus(self, aDrill):
-        "Return minimum copper width if drilled at (0,0) by aDrill."
-        return min([abs(self.ll.x), abs(self.ll.y), abs(self.ur.x), abs(self.ur.y)]) \
-               - aDrill/2.0
+##class Pad(FPCoreObj):
+##    "Pads are sub-prititives of the PinGeometry sub-primitive."
+##    def __init__(self, clearance, mask_relief):
+##        self.clearance = clearance
+##        self.mask_relief = mask_relief
+##    def reprvals(self):
+##        return [self.clearance, self.mask_relief]
 ##    @property
-##    def roundEnds(self):
-##        return False
-        
-
-class RoundedRectPad(RectPad):
-    def __init__(self, p1, p2, clearance, mask_relief, radius=None):
-        RectPad.__init__(self, p1, p2, clearance, mask_relief)
-        self.radius = radius
-    # FIXME: needs constructor LWRO
-    # FIXME: implement specialized extents(), covers(), annulus()
-    @classmethod
-    def fromPad(cls, aPad):
-        radius = aPad.dia/2.0
-        p = Pt(radius, radius)
-        return cls(p,  -p,  aPad.clearance,  aPad.mask_relief, radius)
-    @classmethod
-    def fromRectPad(cls,  rectPad, radius=None):
-        return cls(rectPad.ll, rectPad.ur, rectPad.clearance,
-                   rectPad.mask_relief, radius)
-##    @classmethod
-##    def stretch(cls, aPad, stretch):
-##        "Constructor, make RoundedRectPad by stretching a RoundPad."
-##        t = RectPad.stretch(cls, aPad, stretch)
-##        t.radius = aPad.dia/2.0
-##        return t
-    @property
-    def radius(self):
-        return self._radius
-    @radius.setter
-    def radius(self, v):
-        r = Dim(v)
-        halfSpan = self.ll.min_span(self.ur)/2.0
-        if r and r > halfSpan:
-            raise ValueError('Radius larger than 1/2 width.')
-        self._radius = r
+##    def clearance(self):
+##        return self._clearance
+##    @clearance.setter
+##    def clearance(self, v):
+##        dv = Dim(v)
+##        if dv < 0:
+##            raise ValueError('Clearance must be >= zero.')
+##        self._clearance = dv
 ##    @property
-##    def roundEnds(self):
+##    def mask_relief(self):
+##        return self._relief
+##    @mask_relief.setter
+##    def mask_relief(self, v):
+##        dv = Dim(v)
+##        if dv < 0:
+##            # FIXME: What about tenting??? Maybe should allow
+##            # relief down to -dia/2 -- will need to delgate check to subclasses.
+##            # or add a lower-limit property to subclass -- but have an __init__()
+##            # order issue in that case.
+##            raise ValueError('Mask relief must be >= zero.')
+##        self._relief = dv
+##    def __eq__(self, other):
+##        return self.__class__ == other.__class__ \
+##               and self.clearance == other.clearance \
+##               and self.mask_relief == other.mask_relief
+##    def covers(self, other):
+##        "Returns True if self covers other pad."
+##        raise NotImplementedError('Abstract')
+##    def extents(self):
+##        "Returns list of Pt()'s to be checked by cover()."
+##        raise NotImplementedError('Abstract')
+##    def annulus(self, aDrill):
+##        "Return minimum copper width if drilled at (0,0) by aDrill."
+##        raise NotImplementedError('Abstract')
+##    def valid_annulus(self, aDrill, rules):
+##        "Pad size minus drill size must be >= minannulus."
+##        return self.annulus(aDrill) >= rules['minannulus']
+##        
+##
+##class RoundPad(Pad):
+##    def __init__(self, diameter, clearance, mask_relief):
+##        Pad.__init__(self, clearance, mask_relief)
+##        self.dia = diameter
+##    @property
+##    def dia(self):
+##        return self._dia
+##    @dia.setter
+##    def dia(self, v):
+##        dv = Dim(v)
+##        if dv <= 0.0:
+##            raise ValueError ('Diameter must be > 0.')
+##        self._dia = dv        
+##    def reprvals(self):
+##        return [self.dia, self.clearance, self.mask_relief]
+##    def __eq__(self, other):
+##        return super(RoundPad,self).__eq__(other) \
+##               and self.dia == other.dia
+##    def extents(self):
+##        # Aproximate the extents by 8 points around the circle.
+##        w2 = self.dia/2.0
+##        du = w2.du
+##        l = [Pt(w2,Dim(0,du)), Pt(-w2, Dim(0,du)),
+##             Pt(Dim(0,du), w2), Pt(Dim(0,du),-w2)]
+##        r = w2 * 0.707
+##        l.extend([Pt(r,r),Pt(r,-r),Pt(-r,r),Pt(-r,-r)])
+##        return l
+##    def covers(self, other):
+##        if isinstance(other, RoundPad):
+##            return self.dia >= other.dia
+##        r = self.dia / 2.0
+##        for p in other.extents():
+##            if len(p) > r:
+##                return False
 ##        return True
+##    def annulus(self, aDrill):
+##        "Return minimum copper width if drilled at (0,0) by aDrill."
+##        return (self.dia - aDrill)/2.0
+##
+##class SquarePad(Pad):
+##    def __init__(self, width, clearance, mask_relief):
+##        Pad.__init__(self, clearance, mask_relief)
+##        self.width = width
+##    def reprvals(self):
+##        return [self.width, self.clearance, self.mask_relief]
+##    @property
+##    def width(self):
+##        return self._width
+##    @width.setter
+##    def width(self, v):
+##        w = Dim(v)
+##        if w < 0.0:
+##            raise ValueError('Width must be > 0.')
+##        self._width = w
+##    @property
+##    def dia(self):
+##        # symnonym for width
+##        return self.width
+##    def __eq__(self, other):
+##        return super(SquarePad,self).__eq__(other) \
+##               and self.width == other.width
+##    def extents(self):
+##        w2 = self.width/2.0
+##        return [Pt(-w2,-w2), Pt(w2,-w2), Pt(-w2, w2), Pt(w2,w2)]
+##    def covers(self, other):
+##        if isinstance(other, SquarePad):
+##            return self.width >= other.width
+##        if isinstance(other, RoundPad):
+##            return self.width >= other.dia
+##        w2 = self.width/2.0
+##        ll,ur = Pt(-w2,-w2),Pt(w2,w2)
+##        for p in other.extents():
+##            if p.left_of(ll) or p.below(ll) or p.right_of(ur) or p.above(ur):
+##                return False
+##        return True
+##    def annulus(self, aDrill):
+##        "Return minimum copper width if drilled at (0,0) by aDrill."
+##        return (self.width - aDrill)/2.0
+##        
+##
+##class RectPad(Pad):
+##    def __init__(self, p1, p2, clearance, mask_relief):
+##        Pad.__init__(self, clearance, mask_relief)
+##        # FIXME: Should call Pt() constructors? or type check?
+##        if p1.spans_org(p2):
+##            self.ll,self.ur = p1.rectify(p2)
+##        else:
+##            raise ValueError('Pad must surround (0,0).')
+##    @classmethod
+##    def fromLWO(cls, length, width, clearance, mask_relief, orientation = 'h'):
+##        "Construct from length, width, and orientation."
+##        l = Dim(length)
+##        w = Dim(width)
+##        if orientation not in 'hv':
+##            raise ValueError("Orientation must be 'h' or 'v'.")
+##        x,y = (l/2,w/2) if orientation == 'h' else (w/2,l/2)
+##        return cls(Pt(-x,-y),Pt(x,y), clearance, mask_relief)
+##    @classmethod
+##    def fromPad(cls, aPad):
+##        "Construct RectPad from a SquarePad."
+##        w = aPad.width
+##        p1,p2 = Pt(-w,-w),Pt(w,w)
+##        return cls(p1, p2, aPad.clearance, aPad.mask_relief)
+##    def stretch(self, amount,  direction): 
+##        "Stretch the pad in given direction."
+##        try:
+##            amt = abs(Dim(amount) )
+##        except ValueError:
+##            # Hmmm... well... get a bigger hammer and try again.
+##            amt = abs(Dim(float(amount), self.loc.du))
+##        zero = amt.u0
+##        if direction in ['x', '+x']:
+##            self.ur += Pt(amt, zero)
+##        elif direction == '-x':
+##            self.ll -= Pt(amt, zero)
+##        elif direction in ['y', '+y']:
+##            self.ur += Pt(zero, amt)
+##        elif direction == '-y':
+##            self.ll -= Pt(zero, amt)
+##        else:
+##            raise ValueError('Stretch direction must be one of: x,+x,-x,y,+y,-y')
+##    def reprvals(self):
+##        return [self.ll, self.ur , self.clearance, self.mask_relief]
+##    def __eq__(self, other):
+##        return super(RectPad,self).__eq__(other) \
+##               and self.ll == other.ll \
+##               and self.ur == other.ur
+##    def extents(self):
+##        return [self.ll, self.ur,
+##                pt(self.ll.x, self.ur.y), pt(self.ur.x, self.ll.y)]
+##    def covers(self, other):
+##        for p in other.extents():
+##            if p.left_of(self.ll): return False
+##            if p.below(self.ll): return False
+##            if p.right_of(self.ur): return False
+##            if p.above(self.ur): return False
+##        return True
+##    def annulus(self, aDrill):
+##        "Return minimum copper width if drilled at (0,0) by aDrill."
+##        return min([abs(self.ll.x), abs(self.ll.y), abs(self.ur.x), abs(self.ur.y)]) \
+##               - aDrill/2.0
+####    @property
+####    def roundEnds(self):
+####        return False
+##        
+##
+##class RoundedRectPad(RectPad):
+##    def __init__(self, p1, p2, clearance, mask_relief, radius=None):
+##        RectPad.__init__(self, p1, p2, clearance, mask_relief)
+##        self.radius = radius
+##    # FIXME: needs constructor LWRO
+##    # FIXME: implement specialized extents(), covers(), annulus()
+##    @classmethod
+##    def fromPad(cls, aPad):
+##        radius = aPad.dia/2.0
+##        p = Pt(radius, radius)
+##        return cls(p,  -p,  aPad.clearance,  aPad.mask_relief, radius)
+##    @classmethod
+##    def fromRectPad(cls,  rectPad, radius=None):
+##        return cls(rectPad.ll, rectPad.ur, rectPad.clearance,
+##                   rectPad.mask_relief, radius)
+####    @classmethod
+####    def stretch(cls, aPad, stretch):
+####        "Constructor, make RoundedRectPad by stretching a RoundPad."
+####        t = RectPad.stretch(cls, aPad, stretch)
+####        t.radius = aPad.dia/2.0
+####        return t
+##    @property
+##    def radius(self):
+##        return self._radius
+##    @radius.setter
+##    def radius(self, v):
+##        r = Dim(v)
+##        halfSpan = self.ll.min_span(self.ur)/2.0
+##        if r and r > halfSpan:
+##            raise ValueError('Radius larger than 1/2 width.')
+##        self._radius = r
+####    @property
+####    def roundEnds(self):
+####        return True
+
+#
+# Aperture Classes
+#
+class Aperture(FPCoreObj):
+    pass
+
+class StandardAperture(Aperture):
+    def __init__(self, xholesize=None, yholesize=None):
+        self.xholesize = xholesize
+        self.yholesize = yholesize
+
+class SACircle(StandardAperture):
+    def __init__(self, diameter, xholesize=None, yholesize=None):
+        StandardAperture.__init__(self, xholesize, yholesize)
+        self.diameter = diameter.mustbe(Dim)
+    def reprvals(self):
+        return [self.diameter,self.xholesize,self.yholesize]
+
+class SARectangular(StandardAperture):
+    def __init__(self, xsize, ysize, xholesize=None, yholesize=None):
+        StandardAperture.__init__(self, xholesize, yholesize)
+        self.xsize = xsize
+        self.ysize = ysize
+    @property
+    def is_square(self):
+        return self.xsize == self.ysize
+    def reprvals(self):
+        t = [self.xsize, self.ysize]
+        if self.xholesize is not None or self.yholesize is not None:
+            t.extend([self.xholesize, self.yholesize])
+        return t
+
+class SARectangle(SARectangular):
+    pass
+
+class SAObround(SARectangular):
+    pass
+
+class SAPolygon(StandardAperture):
+    def __init__(self, diameter, num_vertices, rot=None,
+                 xholesize=None, yholesize=None):
+        StandardAperture.__init__(self, xholesize, yholesize)
+        self.diameter = diameter
+        self.num_vertices = num_vertices
+        self.rot = rot
+
+class ApertureMacroPrimitive(FPCoreObj):
+    pass
+
+class MPComment(ApertureMacroPrimitive):
+    def __init__(self, text):
+        pass
+
+class MPCircle(ApertureMacroPrimitive):
+    def __init__(self, diameter, loc, exposure=True):
+        # loc is Pt()
+        pass
+
+class MPVectorLine(ApertureMacroPrimitive):
+    def __init__(self, width, start, end, exposure=True, rot=None):
+        # start,end are Pt()
+        pass
+
+class MPCenterLine(ApertureMacroPrimitive):
+    def __init__(self, width, heigth, loc, exposure=True, rot=None):
+        # loc is Pt()
+        pass
+
+class MPLowerLeftLine(ApertureMacroPrimitive):
+    def __init__(self, width, heigth, loc, exposure=True, rot=None):
+        # loc is Pt()
+        pass
+
+class MPOutline(ApertureMacroPrimitive):
+    def __init__(self, point_list, exposure=True, rot=None):
+        # point_list contains Pt() instances.  Since RS-274X requires
+        # that the last point be equal to the first, the last point is
+        # omitted in point_list, the value is implied.
+        pass
+
+class MPPolygon(ApertureMacroPrimitive):
+    def __init__(self, diameter, num_vertices, loc, exposure=True, rot=0):
+        # loc is Pt()
+        pass
+
+class MPMoire(ApertureMacroPrimitive):
+    def __init__(self, loc, diameter, ring_thickness, ring_gap,
+                 max_num_rings, crosshair_thickness, crosshair_length, rot=None):
+        # loc is a Pt()
+        pass
+
+class MPThermal(ApertureMacroPrimitive):
+    def __init__(self, loc, outer_diameter, inner_diameter, gap_thickness,
+                 rot=None):
+        pass
+
+class ApertureMacro(Aperture):
+    # Has list of primitives.
+    # Has add_<primitive>() methods to add a primitive to the
+    # list.
+    # Has parameter list.
+    # Values can be expression trees.
+    pass
+
+#
+# Mask Classes
+#
+# Mask's can have an ID so that N:1 mapping doesn't cause re-draws.
+# Maybe an automatic serializer in the creator?
+class Mask(Primitive):
+    "Base class for masks."
+    _serial = 0
+    def __init__(self):
+        self.serial = self.__class__._serial
+        self.__class__._serial += 1
+
+class DrawnMask(Mask):
+    # A ShapeInstance. ThermalPads have a list of these.
+    def __init__(self, aperture, loc):
+        Primitive.__init__(self, loc.mustbe(Pt))
+        self.aperture = aperture
+    @classmethod
+    def rectangle(cls, xsize, ysize, loc=None):
+        ap = fpbase.saRectangle(xsize, ysize)
+        return cls(ap, loc)
+
+class DerivedMask(Mask):
+    "Derive a mask by bloating the aperture property of something that has one."
+    # Presumeably, 'base' is a Land()
+    def __init__(self, base, bloat):
+        self.base = base
+        self.bloat = bloat
+    @property
+    def loc(self):
+        return self.base.loc
+
+class NoMask(Mask):
+    "Specifies no mask."
+    pass
+
+#
+# Hole primitives
+#
+class PlatedHole(FPCoreObj):
+    def __init__(self, tent):
+        self.tent = bool(tent)
+
+class PlatedDrill(PlatedHole):
+    def __init__(self, diameter, offset=None, tent=False):
+        PlatedHole.__init__(self, tent)
+        self.offset = Pt.MM(0,0) if offset == None else offset.mustbe(Pt)
+        self.diameter = diameter.mustbe(Dim)
+
+class PlatedSlot(PlatedHole):
+    # Not clear how best to specify.
+    pass
+
+#
+# Paste classes
+#
+# Since gEDA/PCB derives all paste from Mask, the only
+# sensible thing in PCB is a DerivedPaste that points to
+# the Mask shape, or perhaps let None==automatic.
+class Paste(Primitive):
+    pass
+
+class DrawnPaste(Paste):
+    pass
+
+class DerivedPaste(Paste):
+    def __init__(self, base, bloat):
+        self.base = base
+        self.bloat = bloat
+    @property
+    def loc(self):
+        return self.base.loc
+
+class NoPaste(Paste):
+    "Specifies no paste."
+    pass
+
+#
+# Keep-outs
+#
+class CopperKeepout(Primitive):
+    # Specified as an aperture.
+    # List of these hangs off a footprint.
+    pass
+
+#
+# Land pads
+# 
+class Land(Primitive):
+    # Has a shape and a clearance.
+    # Specify clearance by pad shape bloat here.
+    # Specify other clearance shapes at footprint level.
+    # OR.... should per-pad clearance be specified in PinDef?
+    # Issue there is ThruPin may have different clearance per layer.
+    # --
+    # This might be a good place for convenience funcitons to create
+    # the common shapes.
+    def __init__(self, clearance, aperture, loc=None):
+        flashpoint = Pt.MM(0,0) if loc is None else loc.mustbe(Pt)
+        Primitive.__init__(self, flashpoint)
+        self.aperture = aperture.mustbe(Aperture)
+        self.clearance = clearance.mustbe(Dim)
+    def reprvals(self):
+        t = [self.loc, self.aperture, self.clearance]
+        return t
+    @classmethod
+    def circle(cls, clearance, diameter):
+        ap = fpbase.saCircle(diameter)
+        return cls(clearance, ap)
+    @classmethod
+    def square(cls, clearance, diameter):
+        ap = fpbase.saRectangle(diameter, diameter)
+        return cls(clearance, ap)
+    @classmethod
+    def rectangle(cls, clearance, xsize, ysize, loc=None):
+        ap = fpbase.saRectangle(xsize, ysize)
+        return cls(clearance, ap, loc)
+    @classmethod
+    def obround(cls, clearance, xsize, ysize, offset=None):
+        ap = fpbase.saObround(xsize, ysize)
+        return cls(clearance, ap, offset)
         
+
+#
+# Pin Geometry Specifications
+#
 class PinGeometry(FPCoreObj):
-    "PinGeometry is a sub-primitive of the PinSpec primitive."
-    #FIXME: Be sure comp_pad==None and solder_pad==Pad() works, otherwise
-    # won't be able to do double-sided edge connectors correctly.
-    def __init__(self, comp_pad, drill=None, solder_pad=None, inner_pad=None):
-        self.comp_pad = comp_pad
-        self.drill = drill
-        self.solder_pad = solder_pad if solder_pad is not None else (None
-            if drill is None else '=')
-        self.inner_pad = inner_pad
-    @property
-    def comp_pad(self):
-        return self._comp_pad
-    @comp_pad.setter
-    def comp_pad(self, aPad):
-        aPad.mustbe(Pad)
+    pass
+
+class ThruPin(PinGeometry):
+    # One PlatedHole, landing aperture(s), and apertures for masks.
+    # Also aperture for inner land.
+    # 1:1 Mask on comp, 1:1 Mask on solder
+    # no paste
+    # FIXME: symmetry also depends on both masks being derived from same
+    # pad and have same bloat.
+    def __init__(self, hole, solder_land, **kwargs):
+        "kwargs: mask_bloat, solder_mask, comp_land, comp_mask, inner_land"
+        self.hole = hole.mustbe(PlatedHole)
+        self.solder_land = solder_land.mustbe(Land)
         try:
-            if self._solder_pad == '=':
-                # Trap case where breaking symmetry.
-                self._solder_pad = self._comp_pad
-            # FIXME: if setting comp_pad equal to solder_pad, should
-            # check symmetry and set '=' if necessary.
+            self.comp_land = kwargs['comp_land']
+        except KeyError:
+            self.comp_land = '='
+        try:
+            self.inner_land = kwargs['inner_land'].mustbe(Land)
+        except KeyError:
+            self.inner_land = None
+        try:
+            bloat = kwargs['mask_bloat']
+            kwargs['solder_mask'] = fpbase.derivedMask(self.solder_land, bloat)
+            kwargs['comp_mask'] = fpbase.derivedMask(self.comp_land, bloat)
+        except KeyError:
+            pass
+        self.solder_mask = kwargs['solder_mask'].mustbe(Mask)
+        self.comp_mask = kwargs['comp_mask'].mustbe(Mask)
+    def reprvals(self):
+        return [self.hole, self.solder_land, self.comp_land,
+                self.solder_mask, self.comp_mask]
+    @property
+    def solder_land(self):
+        return self._solder_land
+    @solder_land.setter
+    def solder_land(self, v):
+        v.mustbe(Land)
+        try:
+            if self._comp_land == '=':
+                # Trap case of breaking symmetry.
+                self._comp_land = self._solder_land
         except AttributeError:
-            pass # _solder_pad not yet set.
-        self._comp_pad = aPad
+            pass # _comp_land not yet set
+        self._solder_land = v
+        try:
+            if self._solder_land == self._comp_land:
+                # Trap case where creating symmetry.
+                self._comp_land = '='
+        except AttributeError:
+            pass
     @property
-    def drill(self):
-        return self._drill
-    @drill.setter
-    def drill(self, aDrill):
-        if aDrill is not None:
-            aDrill.mustbe(Dim)
-        self._drill = aDrill
-    @property
-    def solder_pad(self):
-##        return self._comp_pad if (self._solder_pad is None or
-##                                  self._solder_pad == '=') else self._solder_pad
-        return self._comp_pad if self._solder_pad == '=' else self._solder_pad
-    @solder_pad.setter
-    def solder_pad(self, aPad):
-        if not(aPad is None or aPad == '=' or isinstance(aPad,Pad)):
-            raise ValueError("Solder pad must be None, '=', or Pad().")
-        #if aPad == None or aPad == self.comp_pad:
-        if aPad == self.comp_pad:
-            # Trap redundant solder_pad value and force to symmetric.
-            self._solder_pad = '='
-        else:
-            self._solder_pad = aPad
-        if 'p' in debug:
-            print '_solder_pad:',self._solder_pad, self.solder_pad
+    def comp_land(self):
+        return self._solder_land if (self._comp_land == '=') \
+               else self._comp_land
+    @comp_land.setter
+    def comp_land(self, v):
+        try:
+            self._comp_land = '=' if v == '=' or v == self.solder_land \
+                                 else v.mustbe(Land)
+        except AttributeError:
+            self._comp_land = v.mustbe(Land) # _solder_land not yet set.
     @property
     def symmetric(self):
-        return self._solder_pad == '=' or self._comp_pad == self._solder_pad
-    @property
-    def inner_pad(self):
-        return self._inner_pad
-    @inner_pad.setter
-    def inner_pad(self, aPad):
-        if aPad != None: raise NotImplementedError('Inner pads not yet supported.')
-        self._inner_pad = aPad
-    def reprvals(self):
-        l = [self.comp_pad]
-        if self.drill != None or self.solder_pad != None or self.inner_pad != None:
-            l.append(self.drill)
-        if self.solder_pad != None or self.inner_pad != None:
-            l.append(self._solder_pad)
-        if self.inner_pad != None:
-            l.append(self.inner_pad)
-        return l
-    def valid(self, rules):
-        if not self.comp_pad.valid_annulus(self.drill, rules): return False
-        if not (self.symmetric or self.comp_pad.valid_annulus(self.drill, rules)): return False
-        if self.drill < rules['mindrill']: return False        
+        return self._comp_land == '='
+    @classmethod
+    def circle(cls, drill, clearance, diameter, mbloat):
+        dr = fpbase.platedDrill(drill) 
+        land = fpbase.land.circle(clearance, diameter)
+        return cls(dr, land, mask_bloat=mbloat)
+    @classmethod
+    def square(cls, drill, clearance, diameter, mbloat):
+        dr = fpbase.platedDrill(drill) 
+        land = fpbase.land.square(clearance, diameter)
+        return cls(dr, land, mask_bloat=mbloat)
+    @classmethod
+    def obround(cls, drill, clearance, xsize, ysize, mbloat, offset=None):
+        pass
+    @classmethod
+    def obround_solder(cls, drill, clearance, comp_dia, mbloat, **kwargs):
+        "Must specify one of xstretch, ystretch. Optionally: solder_dia."
+        try:
+            solder_dia = kwargs['solder_dia']
+        except:
+            solder_dia = comp_dia
+        try:
+            stretch = kwargs['xstretch']
+            offset = Pt(stretch/2.0, Dim.MM(0))
+            xsize, ysize = solder_dia + abs(stretch), solder_dia
+        except:
+            stretch = kwargs['ystretch']
+            offset = Pt(Dim.MM(0), stretch/2.0)
+            xsize, ysize = solder_dia, solder_dia + abs(stretch)
+        dr = fpbase.platedDrill(drill)
+        topland = fpbase.land.circle(clearance, comp_dia)
+        botland = fpbase.land.obround(clearance, xsize, ysize, offset)
+        return cls(dr, botland, comp_land=topland, mask_bloat=mbloat)
+        
+##        "Must specify one of xlength, ylength in kwags."
+##        try:
+##            direction = -1.0 if kwargs['dir'] in ['down','left'] else 1.0
+##        except KeyError:
+##            direction = 1.0
+##        try:
+##            xsize, ysize = kwargs['xlength'], diameter
+##            offset = ((xsize-diameter)/2.0) * direction
+##        except KeyError:
+##            xsize, ysize = diameter, kwargs['ylength']
+##            offset = ((ysize-diameter)/2.0) * direction
+##        dr = fobase.platedDrill(drill) # FIXME: Complete constructor
+##        topland = fpbase.land.circle(clearance, diameter)
+##        botland = fpbase.land.obround(clearance, xsize, ysize, offset)
+##        return cls(dr, botland, comp_land=topland, mask_bloat=mbloat)
+        
+            
+class SMTPad(PinGeometry):
+    # Single SMT pad.
+    # N:1 mapping of SMTPads to to Mask is allowed.  This allows
+    # construction of a gang mask.  Should have convenience functions
+    # for creation of a gang mask.
+    # 1:1 to Paste
+    def __init__(self, land, **kwargs):
+        "kwargs: paste, mask, onback"
+        self.land = land.mustbe(Land)
+        try:
+            self.paste = kwargs['paste'].mustbe(Paste)
+        except KeyError:
+            self.paste = fpbase.derivedPaste(self.land, Dim.MM(0))
+        try:
+            t = kwargs['mask']
+            self.mask = fpbase.derivedMask(self.land, t) if isinstance(t, Dim) \
+                        else t.mustbe(Mask)
+        except KeyError:
+            self.mask = fpbase.noMask()
+        # 'onback' flag is for building edge connectors or anyplace there
+        # is a land on the side opposite the component.
+        try:
+            self.onback = bool(kwargs['onback'])
+        except KeyError:
+            self.onback = False
+    @classmethod
+    def obround(cls, clearance, xsize, ysize, mbloat):
+        land = fpbase.land.obround(clearance, xsize, ysize)
+        return cls(land, mask=mbloat.mustbe(Dim))
+    @classmethod
+    def gang(cls, pads, bloat):
+        """Construct gang mask by bloating extremes of listed pads,
+        set all pads to gang."""
+        # Result will be a DrawnMask()
+        pass
+
+class ThermalPolygon(PinGeometry):
+    # Has a list of AntiMasks on each side.
+    # 1 land, N holes
+    # 1:N to Mask
+    # 1:M to Paste
+    # FIXME: onback should probably be back_land instead.
+    def __init__(self, land, holes, masks, pastes, back_land=None):
+        # FIXME: Should land and masks be polygon shapes?
+        # To be apertures it would require that they be macros
+        # containing polygons.  But that would qualify is a land.
+        # If specified as a plain polygon, then the renderer has
+        # more options as to how to implement.
+        # Implementation options:
+        # 1. everything is a land.
+        #  1a. renderer bails on macros.
+        #  1b. renderer deals with very simple aperture macros.
+        # 2. thermal is a point polygon, masks and pastes are lands.
+        #  2a. point polygon can be a class methods that constructs
+        #      a contour primitive in an aperture macro.
+        # DECISION: Go with Land.  Let renderer evolve.  Can use
+        # simple built-in rectangle land for now.  Use a classmethod
+        # as a constructor to abstract away some of the confusion.
+        self.land = land.mustbe(Land)
+        self.holes = [h.mustbe(PlatedHole) for h in holes]
+        self.masks = [m.mustbe(Mask) for m in masks]
+        self.pastes = [p.mustbe(Paste) for p in pastes]
+        self.back_land = None if back_land is None else back_land.mustbe(Land)
+    @classmethod
+    def rectangle(cls, clearance, cu_ll, cu_ur, mask_ll, mask_ur,
+                  drillsize, drill_locs):
+        """Rectangular pad and mask. Pastes derived from mask.
+        drill field auto-constructed. ll/ur is relative to flash point."""
+        cu_span = cu_ur - cu_ll
+        offset = (cu_ur + cu_ll) / 2.0
+        land = fpbase.land.rectangle(clearance, cu_span.x, cu_span.y, offset)
+        # FIXME: mask might be none
+        if mask_ll:
+            mask_span = mask_ur - mask_ll
+            offset = (mask_ur + mask_ll) / 2.0
+            mask = fpbase.drawnMask.rectangle(mask_span.x, mask_span.y, offset)
+            paste = fpbase.derivedPaste(mask,0)
+            masks = [mask]
+            pastes = [paste]
+        else:
+            masks = []
+            pastes = []
+        if drill_locs:
+            holes = [fpbase.platedDrill(drillsize, loc) for loc in drill_locs]
+            # FIXME: Should add tenting for drill hits within the mask openning.
+        else:
+            holes = []
+        return cls(land, holes, masks, pastes) 
+        
+
+####
+### WAS
+######
+
+
+
+#
+# Pin Classes
+#
+##class PinGeometry(FPCoreObj):
+##    "PinGeometry is a sub-primitive of the PinSpec primitive."
+##    #FIXME: Be sure comp_pad==None and solder_pad==Pad() works, otherwise
+##    # won't be able to do double-sided edge connectors correctly.
+##    def __init__(self, comp_pad, drill=None, solder_pad=None, inner_pad=None):
+##        self.comp_pad = comp_pad
+##        self.drill = drill
+##        self.solder_pad = solder_pad if solder_pad is not None else (None
+##            if drill is None else '=')
+##        self.inner_pad = inner_pad
+##    @property
+##    def comp_pad(self):
+##        return self._comp_pad
+##    @comp_pad.setter
+##    def comp_pad(self, aPad):
+##        aPad.mustbe(Pad)
+##        try:
+##            if self._solder_pad == '=':
+##                # Trap case where breaking symmetry.
+##                self._solder_pad = self._comp_pad
+##            # FIXME: if setting comp_pad equal to solder_pad, should
+##            # check symmetry and set '=' if necessary.
+##        except AttributeError:
+##            pass # _solder_pad not yet set.
+##        self._comp_pad = aPad
+##    @property
+##    def drill(self):
+##        return self._drill
+##    @drill.setter
+##    def drill(self, aDrill):
+##        if aDrill is not None:
+##            aDrill.mustbe(Dim)
+##        self._drill = aDrill
+##    @property
+##    def solder_pad(self):
+####        return self._comp_pad if (self._solder_pad is None or
+####                                  self._solder_pad == '=') else self._solder_pad
+##        return self._comp_pad if self._solder_pad == '=' else self._solder_pad
+##    @solder_pad.setter
+##    def solder_pad(self, aPad):
+##        if not(aPad is None or aPad == '=' or isinstance(aPad,Pad)):
+##            raise ValueError("Solder pad must be None, '=', or Pad().")
+##        #if aPad == None or aPad == self.comp_pad:
+##        if aPad == self.comp_pad:
+##            # Trap redundant solder_pad value and force to symmetric.
+##            self._solder_pad = '='
+##        else:
+##            self._solder_pad = aPad
+##        if 'p' in debug:
+##            print '_solder_pad:',self._solder_pad, self.solder_pad
+##    @property
+##    def symmetric(self):
+##        return self._solder_pad == '=' or self._comp_pad == self._solder_pad
+##    @property
+##    def inner_pad(self):
+##        return self._inner_pad
+##    @inner_pad.setter
+##    def inner_pad(self, aPad):
+##        if aPad != None: raise NotImplementedError('Inner pads not yet supported.')
+##        self._inner_pad = aPad
+##    def reprvals(self):
+##        l = [self.comp_pad]
+##        if self.drill != None or self.solder_pad != None or self.inner_pad != None:
+##            l.append(self.drill)
+##        if self.solder_pad != None or self.inner_pad != None:
+##            l.append(self._solder_pad)
+##        if self.inner_pad != None:
+##            l.append(self.inner_pad)
+##        return l
+##    def valid(self, rules):
+##        if not self.comp_pad.valid_annulus(self.drill, rules): return False
+##        if not (self.symmetric or self.comp_pad.valid_annulus(self.drill, rules)): return False
+##        if self.drill < rules['mindrill']: return False        
 
 class PinInfo(Primitive):
     # FIXME: Refactor pin number and pin name down here.
@@ -965,7 +1427,8 @@ class PinInfo(Primitive):
     pass
 
 class PinSpec(PinInfo):
-    def __init__(self, loc, pin_number, pin_geometry, rotation = 0, pin_name = None):
+    def __init__(self, loc, pin_number, pin_geometry,
+                 rotation = 0, pin_name = None):
         super(PinSpec, self).__init__(loc)
         self.num = int(pin_number)
         self.geo = pin_geometry.mustbe(PinGeometry)
@@ -991,62 +1454,65 @@ class PinSpec(PinInfo):
     def name(self, v):
         self._name = str(v)
         
-class PinGang(PinInfo):
-    def __init__(self, gang_mask_relief, pin_list):
-        self.relief = gang_mask_relief # Mask relief at the extents of extreme pads.
-        self.pins = pin_list # List of PinSpec() instances.
-    def reprvals(self):
-        return [self.relief, self.pins]
-    @property
-    def relief(self):
-        return self._relief
-    @relief.setter
-    def relief(self, v):
-        self._relief = v.mustbe(Dim, "Gang mask relief must be Dim().")
-    @property
-    def pins(self):
-        return self._pins
-    @pins.setter
-    def pins(self, l):
-        # Raise TypeError if not all elements of list l are PinSpec.
-        if not min([isinstance(x, PinSpec) for x in l]):
-            raise TypeError("List must contain PinSpec()'s.")
-        self._silk = l
+##class PinGang(PinInfo):
+##    def __init__(self, gang_mask_relief, pin_list):
+##        self.relief = gang_mask_relief # Mask relief at the extents of extreme pads.
+##        self.pins = pin_list # List of PinSpec() instances.
+##    def reprvals(self):
+##        return [self.relief, self.pins]
+##    @property
+##    def relief(self):
+##        return self._relief
+##    @relief.setter
+##    def relief(self, v):
+##        self._relief = v.mustbe(Dim, "Gang mask relief must be Dim().")
+##    @property
+##    def pins(self):
+##        return self._pins
+##    @pins.setter
+##    def pins(self, l):
+##        # Raise TypeError if not all elements of list l are PinSpec.
+##        if not min([isinstance(x, PinSpec) for x in l]):
+##            raise TypeError("List must contain PinSpec()'s.")
+##        self._silk = l
+##
+##class ThermalSink(PinInfo):
+##    "Primtive defining a thermal sink area."
+##    def __init__(self, loc, comp_cu, comp_mask, solder_cu, solder_mask, drills,
+##                 pin_number, pin_name = ''):
+##        self.loc = loc
+##        self.num = int(pin_number)
+##        self.name = pin_name if pin_name else str(pin_number)
+##        self.comp_cu = self._check_poly(comp_cu)
+##        self.comp_mask = self._check_mpoly(comp_mask)
+##        self.solder_cu = self._check_poly(solder_cu)
+##        self.solder_mask = self._check_mpoly(solder_mask)
+##        self.drills = self._check_drills(drills)
+##    def _check_poly(self, gon):
+##        if not gon:
+##            return []
+##        if not min([isinstance(x,Pt) for x in gon]):
+##            raise ValueError('Polygon must be list of points.')
+##        if len(gon) < 3:
+##            raise ValueError('Polygon must contain at least 3 points.')
+##        return gon
+##    def _check_mpoly(self, manygons):
+##        if not manygons:
+##            return []
+##        if not isinstance(manygons[0],list):
+##            manygons = [manygons]
+##        return [self._check_poly(gons) for gons in manygons]
+##    def _check_drills(self, drls):
+##        if not drls:
+##            return []
+##        if not min([isinstance(p,Pt) and isinstance(d,Dim) for
+##                    p,d in drls]):
+##            raise ValueError('Drill list must be tuples of (Pt(),Dim()).')
+##        return drls
 
-class ThermalSink(PinInfo):
-    "Primtive defining a thermal sink area."
-    def __init__(self, loc, comp_cu, comp_mask, solder_cu, solder_mask, drills,
-                 pin_number, pin_name = ''):
-        self.loc = loc
-        self.num = int(pin_number)
-        self.name = pin_name if pin_name else str(pin_number)
-        self.comp_cu = self._check_poly(comp_cu)
-        self.comp_mask = self._check_mpoly(comp_mask)
-        self.solder_cu = self._check_poly(solder_cu)
-        self.solder_mask = self._check_mpoly(solder_mask)
-        self.drills = self._check_drills(drills)
-    def _check_poly(self, gon):
-        if not gon:
-            return []
-        if not min([isinstance(x,Pt) for x in gon]):
-            raise ValueError('Polygon must be list of points.')
-        if len(gon) < 3:
-            raise ValueError('Polygon must contain at least 3 points.')
-        return gon
-    def _check_mpoly(self, manygons):
-        if not manygons:
-            return []
-        if not isinstance(manygons[0],list):
-            manygons = [manygons]
-        return [self._check_poly(gons) for gons in manygons]
-    def _check_drills(self, drls):
-        if not drls:
-            return []
-        if not min([isinstance(p,Pt) and isinstance(d,Dim) for
-                    p,d in drls]):
-            raise ValueError('Drill list must be tuples of (Pt(),Dim()).')
-        return drls
-    
+#
+# Silk classes
+#
 class Silk(Primitive):
     def __init__(self, loc, pen_width):
         super(Silk, self).__init__(loc)
@@ -1077,6 +1543,7 @@ class SilkText(Silk):
 ##    def size(self, v):
 ##        if not isinstance(v, Dim): raise ValueError
 ##        self._sz = v
+
 
 class RefDes(SilkText):
     pass
@@ -1195,19 +1662,47 @@ class Footprint(FPCoreObj):
     # Plugins MUST instantiate primitive and sub-primitive classes
     # via these class variables so that rendering classes may
     # provide alternate specializations of them.
-    roundPad = RoundPad
-    squarePad = SquarePad
-    rectPad = RectPad
-    roundedRectPad = RoundedRectPad
-    pinGeometry = PinGeometry
+##    roundPad = RoundPad
+##    squarePad = SquarePad
+##    rectPad = RectPad
+##    roundedRectPad = RoundedRectPad
+    # Standard Apertures
+    saCircle = SACircle
+    saRectangle = SARectangle
+    saObround = SAObround
+    saPolygon = SAPolygon
+    # Aperture Macros
+    mpComment = MPComment
+    mpCircle = MPCircle
+    mpVectorLine = MPVectorLine
+    mpCenterLine = MPCenterLine
+    mpLowerLeftLine = MPLowerLeftLine
+    mpOutline = MPOutline
+    mpPolygon = MPPolygon
+    mpMoire = MPMoire
+    mpThermal = MPThermal
+    apertureMacro = ApertureMacro
+    # Masks
+    drawnMask = DrawnMask
+    derivedMask = DerivedMask
+    noMask = NoMask
+    # Plated holes
+    platedDrill = PlatedDrill
+    platedSlot = PlatedSlot
+    # Landmaker primitives
+    land = Land
+##    pinGeometry = PinGeometry
+    thruPin = ThruPin
+    smtPad = SMTPad
+    thermalPolygon = ThermalPolygon
     pinSpec = PinSpec
-    pinGang = PinGang
+##    pinGang = PinGang
     silkText = SilkText
     refDes = RefDes
     silkLine = SilkLine
     silkArc = SilkArc
     keepOutRect = KeepOutRect
-    thermalSink = ThermalSink
+##    thermalSink = ThermalSink
     def __init__(self, name, description, refdes, pins = [], silk = [], \
                  comments = [], keepOuts = []):
         self.name = str(name) if name is not None else ''
@@ -1545,6 +2040,8 @@ def importPlugins(plugins, callerGlobals, callerLocals):
         
 def deriveRenderingClasses(plugins, prefix, renderBase, callerGlobals):
     "Create a rendering class that inherits from the classes: (renderBase, pluginClass)"
+    global fpbase
+    fpbase = renderBase
     for verb in plugins:
         moduleName, puClass, module = plugins[verb]
         renderClassName = '_'.join([prefix, puClass])

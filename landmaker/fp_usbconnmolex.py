@@ -50,34 +50,44 @@ class FP_usbconnmolex(fc.Footprint):
         if kw['type'] == '54819-0519':
             # Construct pads
             exactDrill = fc.Dim.MM(0.7)
-            ioPadDia = fc.Dim.MM(1.05)
-            ioTopPad = cls.roundPad(ioPadDia, clearance, maskrelief)
+##            ioPadDia = fc.Dim.MM(1.05)
+##            ioTopPad = cls.roundPad(ioPadDia, clearance, maskrelief)
             rackDrill =  rack[exactDrill]
-            if not ioTopPad.valid_annulus(rackDrill, rules):
-                warning_callback('Rack drill too large.')
-                if 'metric' in kw:
-                    warning_callback('Using ' + str(exactDrill))
-                    ioDrill = exactDrill
-                else:
-                    warning_callback('Using #70.')
-                    ioDrill = fc.Dim.DRILL('#70')
-            else:
-                ioDrill = rackDrill
+##            if not ioTopPad.valid_annulus(rackDrill, rules):
+##                warning_callback('Rack drill too large.')
+##                if 'metric' in kw:
+##                    warning_callback('Using ' + str(exactDrill))
+##                    ioDrill = exactDrill
+##                else:
+##                    warning_callback('Using #70.')
+##                    ioDrill = fc.Dim.DRILL('#70')
+##            else:
+##                ioDrill = rackDrill
+            
+            ioDrill = fc.Dim.DRILL('#70')
             mountDrill = rack[fc.Dim.MM(1.9)]
-            # Make bot I/O pads by stretching.
-            stretch_by = fc.Dim.MM(1.65) - ioTopPad.dia
-            ioBotPadL = cls.roundedRectPad.fromPad(ioTopPad)
-            ioBotPadL.stretch(stretch_by,  '-x')
-            ioBotPadR = cls.roundedRectPad.fromPad(ioTopPad)
-            ioBotPadR.stretch(stretch_by,  '+x')
-##            stretchBy = fc.Dim.MM(1.65) - ioTopPad.dia
-##            ioBotPadL = cls.roundedRectPad.stretch(ioTopPad,-stretchBy, 0)
-##            ioBotPadR = cls.roundedRectPad.stretch(ioTopPad, stretchBy, 0)
-            mountPad = cls.roundPad(fc.Dim.MM(2.7), clearanceRule, maskrelief)
+##            # Make bot I/O pads by stretching.
+##            stretch_by = fc.Dim.MM(1.65) - ioTopPad.dia
+            ioPadDia = fc.Dim.MM(1.05)
+            stretch_by = fc.Dim.MM(1.65) - ioPadDia
+##            ioBotPadL = cls.roundedRectPad.fromPad(ioTopPad)
+##            ioBotPadL.stretch(stretch_by,  '-x')
+##            ioBotPadR = cls.roundedRectPad.fromPad(ioTopPad)
+##            ioBotPadR.stretch(stretch_by,  '+x')
+####            stretchBy = fc.Dim.MM(1.65) - ioTopPad.dia
+####            ioBotPadL = cls.roundedRectPad.stretch(ioTopPad,-stretchBy, 0)
+####            ioBotPadR = cls.roundedRectPad.stretch(ioTopPad, stretchBy, 0)
+##            mountPad = cls.roundPad(fc.Dim.MM(2.7), clearanceRule, maskrelief)
             # Construct Pin geometries
-            ioLGeo = cls.pinGeometry(ioTopPad, ioDrill, ioBotPadL)
-            ioRGeo = cls.pinGeometry(ioTopPad, ioDrill, ioBotPadR)
-            mntGeo = cls.pinGeometry(mountPad, mountDrill)
+            ioLGeo = cls.thruPin.obround_solder(ioDrill, clearance,
+                ioPadDia, maskrelief, xstretch= -stretch_by)
+            ioRGeo = cls.thruPin.obround_solder(ioDrill, clearance,
+                ioPadDia, maskrelief, xstretch= stretch_by)
+            mntGeo = cls.thruPin.circle(mountDrill, clearance, fc.Dim.MM(2.7),
+                                  maskrelief)
+##            ioLGeo = cls.pinGeometry(ioTopPad, ioDrill, ioBotPadL)
+##            ioRGeo = cls.pinGeometry(ioTopPad, ioDrill, ioBotPadR)
+##            mntGeo = cls.pinGeometry(mountPad, mountDrill)
             # Construct pin specs
             pinLx = fc.Dim.MM(-1.2)
             pinLy = fc.Dim.MM(0.8)

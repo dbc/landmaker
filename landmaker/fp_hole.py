@@ -80,11 +80,8 @@ class FP_hole(fc.Footprint):
             fc.trace('maskrelief',globals(),locals())
         # Select drill
         rackDrill = rack[args.drill]
-        # construct Pad
-        pad = cls.roundPad(args.pad, clearance, maskrelief)
-        # construct pin geometry
-        geo = cls.pinGeometry(pad, rackDrill, '=')
-        # construct pin specs
+        # Construct pin geometry and pin spec
+        geo = cls.thruPin.circle(rackDrill, clearance, args.pad, maskrelief)
         pinSpecs = [cls.pinSpec(fc.Pt.MIL(0,0),1,geo)]
         # No silk
         silk = []
@@ -99,13 +96,17 @@ class FP_hole(fc.Footprint):
         return cls(footprintname, desc, rd, pinSpecs, silk, cmt, keepOuts)
     @classmethod
     def _norm_args(cls, kwargs):
+        normed_args = {}
+        normed_args['pad'] = kwargs['pad'].mustbe(fc.Dim)
         try:
-            if kwargs['fit'] not in ['free','close']:
+            fit = kwargs['fit']
+            if fit not in ['free','close']:
                 raise fc.ParamValueError('fit must be one of: "free","close".')
         except KeyError:
-            kwargs['fit'] = 'free'
+            fit = 'free'
+        normed_args['fit'] = fit
         try:
-            drill = kwargs['drill']
+            normed_args['drill'] = kwargs['drill']
         except KeyError:
             try:
                 screw=kwargs['screw']
@@ -118,6 +119,6 @@ class FP_hole(fc.Footprint):
                     drillChoices = number[screw]
                 except KeyError:
                     raise fc.ParamValueError(screw.join(["drill '","' not found."]))
-            kwargs['drill'] = drillChoices.free_fit if fit == 'free' else drillChoices.close_fit
-        return cls.arg_object(kwargs)
+            normed_args['drill'] = drillChoices.free_fit if fit == 'free' else drillChoices.close_fit
+        return cls.arg_object(normed_args)
        

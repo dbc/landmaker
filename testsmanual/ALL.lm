@@ -2,7 +2,7 @@ fp . hole pad=7mm drill=3mm > hole_3mm_7mm.fp
 fp . hole pad=45mil drill=.020inch > hole_45_020.fp
 fp . enc type='RE130F' > re130f.fp
 fp . so pins=20 padlen=1.3mm padwidth=.6mm pitch=1.27mm span=10.65mm pkglen=13mm > so01.fp
-fp . so pins=20 padlen=1.3mm padwidth=.6mm pitch=1.27mm span=10.65mm pkglen=13mm thermal=6,14 vias=2,4 viadrill=.015in thermalexp=4,10 > so02.fp
 fp . th2pad desc='foo' dia=45 spacing=450 drill=.02 artwidth=200 > th2pad01.fp
 fp . th2pad desc='foo' dia=30 spacing=550 drill=.02 artwidth=150 > th2pad02.fp
 fp . usbconnmolex type='54819-0519' > usb.fp
+fp . so pins=20 padlen=1.3mm padwidth=.6mm pitch=1.27mm span=10.65mm pkglen=13mm thermal=6,14 vias=2,4 viadrill=.015in thermalexp=4,10 > so02.fp

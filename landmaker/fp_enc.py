@@ -52,11 +52,14 @@ class FP_enc(fc.Footprint):
             if True:
                 # Someday there might be a parameter option w.r.t. drill
                 ioDrill = rackDrill
-            ioPad = cls.roundPad(ioPadDia, clearance, maskrelief)
-            mntPad = cls.roundPad(mntPadDia, clearance, maskrelief)
-            # Construct Pin geometries
-            ioGeo = cls.pinGeometry(ioPad, ioDrill,'=')
-            mntGeo = cls.pinGeometry(mntPad, mntRackDrill,'=')
+##            ioPad = cls.roundPad(ioPadDia, clearance, maskrelief)
+##            mntPad = cls.roundPad(mntPadDia, clearance, maskrelief)
+##            # Construct Pin geometries
+##            ioGeo = cls.pinGeometry(ioPad, ioDrill,'=')
+##            mntGeo = cls.pinGeometry(mntPad, mntRackDrill,'=')
+            # Construct Pin Geometries
+            ioGeo = cls.thruPin.circle(ioDrill, clearance, ioPadDia, maskrelief)
+            mntGeo = cls.thruPin.circle(mntRackDrill, clearance, mntPadDia, maskrelief)
             # Construct pin specs
             pinSpecs = []
             pinSpecs.append(cls.pinSpec(fc.Pt.MIL(-275, 100),1,ioGeo))

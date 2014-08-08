@@ -73,8 +73,9 @@ class FP_so(fc.Footprint):
         padwidth = kw['padwidth']
         ur = fc.Pt(padlen/2.0, padwidth/2.0)
         ll = - ur
-        pad = cls.rectPad(ll, ur, clear, mask)
-        pingeo = cls.pinGeometry(pad)
+##        pad = cls.rectPad(ll, ur, clear, mask)
+##        pingeo = cls.pinGeometry(pad)
+        pingeo = cls.smtPad.obround(clear, padlen, padwidth, mask)
         #print 'fp pingeo:',repr(pingeo)
         # Make pins.
         pinx = (kw['span']-padwidth)/2.0
@@ -92,17 +93,47 @@ class FP_so(fc.Footprint):
 ##        leftpins.extend(rightpins)
 ##        pins = [cls.pinSpec(loc, num, pingeo) for num, loc in leftpins]
         # Make thermal pad.
-        thermal_cu = cls._thermal_rect('thermal',**kw)
+##        thermal_cu = cls._thermal_rect('thermal',**kw)
+        thermal_cu = kw['thermal']
         if thermal_cu:
-            thermal_antimask = cls._thermal_rect('thermalexp',**kw)
-            thermal_drills = cls._drill_field(thermal_cu[0],**kw)
-            if not thermal_antimask:
+            print thermal_cu
+            cu_x, cu_y = thermal_cu
+            cu_ur = fc.Pt(cu_x/2.0, cu_y/2.0)
+            cu_ll = -cu_ur
+            ##thermal_antimask = cls._thermal_rect('thermalexp',**kw)
+            thermal_antimask = kw['thermalexp']
+            if thermal_antimask:
+                mask_x, mask_y = thermal_antimask
+                mask_ur = fc.Pt(mask_x/2.0, mask_y/2.0)
+                mask_ll = -mask_ur
+            else:
+                mask_ll, mask_ur = None,None
                 warning_callback('No thermal anti-mask specified.')
-            t = cls.thermalSink(fc.Pt.MM(0,0), thermal_cu, [thermal_antimask],
-                               [],[], # nothing on solder side
-                                thermal_drills,
-                                numpins+1,'THRM')
-            pins.append(t)
+            #thermal_drills = cls._drill_field(thermal_cu[0],**kw)
+            thermal_drills = kw['vias']
+            if thermal_drills:
+                x_drills, y_drills = (int(x) for x in thermal_drills)
+                p0 = cu_ll + fc.Pt(cu_x/(2.0 * x_drills), cu_y/(2.0 * y_drills))
+                p1 = p0 + fc.Pt(cu_x/x_drills, cu_y/y_drills)
+                drill_points = fc.Pt.point_array(p0,p1,(x_drills, y_drills)) # FIXME: Lame error checking.
+            else:
+                drill_points = []
+            print 'drill points',drill_points
+            drill_size = kw['viadrill']
+            t = cls.thermalPolygon.rectangle(
+                clear, cu_ll, cu_ur, mask_ll, mask_ur,
+                drill_size, drill_points)
+            pins.append(cls.pinSpec(fc.Pt.MM(0,0), numpins+1, t, 0, 'THRM' ))
+            # WAS
+##            thermal_antimask = cls._thermal_rect('thermalexp',**kw)
+##            thermal_drills = cls._drill_field(thermal_cu[0],**kw)
+##            if not thermal_antimask:
+##                warning_callback('No thermal anti-mask specified.')
+##            t = cls.thermalSink(fc.Pt.MM(0,0), thermal_cu, [thermal_antimask],
+##                               [],[], # nothing on solder side
+##                                thermal_drills,
+##                                numpins+1,'THRM')
+           ## pins.append(t)
             
         # Make silk -- be sure it doesn't run into thermal anti-mask.
         pkglen = kw['pkglen']
